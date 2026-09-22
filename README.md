@@ -33,4 +33,4 @@ streamlit run app.py
 | `vetlocator.py` | routing, hours parsing, data providers, merge, map rendering (generated from the notebook) |
 | `requirements.txt` | Python packages |
 
-Routing: OSRM (public demo server). Geocoding: Nominatim. Live clinics: Google Places (New) or OpenStreetMap Overpass. All calls are cached on disk for the life of the app instance.
+Routing: OSRM (public demo server). Geocoding: US Census, ArcGIS, Photon, Nominatim (Google first when a key is set). Live clinics: Google Places (New) or OpenStreetMap Overpass. All calls are cached on disk for the life of the app instance.

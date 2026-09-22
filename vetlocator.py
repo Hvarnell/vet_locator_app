@@ -54,22 +54,75 @@ def haversine_mi(lat1, lon1, lat2, lon2):
     return 2 * R * np.arcsin(np.sqrt(a))
 
 
+def _geo_google(q):
+    if not GOOGLE_MAPS_API_KEY:
+        return None
+    j = _get_json(PLACES_TEXT_URL, data=json.dumps({"textQuery": q, "pageSize": 1}), method="POST", timeout=20, tries=1,
+                  headers={"Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+                           "X-Goog-FieldMask": "places.location"})
+    pl = j.get("places") or []
+    return (pl[0]["location"]["latitude"], pl[0]["location"]["longitude"]) if pl else None
+
+
+def _geo_census(q):
+    """US Census Bureau geocoder: exact for street addresses, no match for bare town names."""
+    if not re.match(r"\s*\d", q):
+        return None
+    j = _get_json("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress",
+                  params={"address": q, "benchmark": "Public_AR_Current", "format": "json"}, timeout=20, tries=1)
+    m = j.get("result", {}).get("addressMatches") or []
+    return (m[0]["coordinates"]["y"], m[0]["coordinates"]["x"]) if m else None
+
+
+def _geo_arcgis(q):
+    j = _get_json("https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+                  params={"SingleLine": q, "f": "json", "maxLocations": 1, "sourceCountry": "USA"}, timeout=20, tries=1)
+    c = j.get("candidates") or []
+    return (c[0]["location"]["y"], c[0]["location"]["x"]) if c and c[0].get("score", 100) >= 80 else None
+
+
+def _geo_photon(q):
+    j = _get_json("https://photon.komoot.io/api/", params={"q": q, "limit": 1, "lang": "en"}, timeout=20, tries=1)
+    f = j.get("features") or []
+    return (f[0]["geometry"]["coordinates"][1], f[0]["geometry"]["coordinates"][0]) if f else None
+
+
+def _geo_nominatim(q):
+    j = _get_json(NOMINATIM_URL, params={"q": q, "format": "json", "limit": 1}, timeout=20, tries=1)
+    time.sleep(1.0)                                            # Nominatim's limit: one request per second
+    return (float(j[0]["lat"]), float(j[0]["lon"])) if j else None
+
+
+# Tried in this order; a provider that errors or finds nothing hands over to the next.  Google first when a key is
+# set; Census and ArcGIS place street addresses exactly; Photon centres a street rather than the house; Nominatim
+# last because it rate-limits shared cloud addresses (HTTP 429).
+GEOCODERS = [("Google", _geo_google), ("US Census", _geo_census), ("ArcGIS", _geo_arcgis),
+             ("Photon", _geo_photon), ("Nominatim", _geo_nominatim)]
+
+
 def geocode(query):
-    """'lat,lng' text or a (lat, lng) pair passes through; anything else goes to Nominatim (cached, 1 request/s)."""
+    """'lat,lng' text or a (lat, lng) pair passes through; anything else goes through GEOCODERS (cached on disk)."""
     if isinstance(query, (tuple, list)):
         return float(query[0]), float(query[1])
-    m = re.fullmatch(r"\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*", str(query))
+    q = str(query).strip()
+    m = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)", q)
     if m:
         return float(m.group(1)), float(m.group(2))
-    p = _cache_path("geocode", query)
+    p = _cache_path("geocode", q)
     if p.exists():
-        j = json.loads(p.read_text())
-    else:
-        j = _get_json(NOMINATIM_URL, params={"q": query, "format": "json", "limit": 1})
-        p.write_text(json.dumps(j)); time.sleep(1.0)
-    if not j:
-        raise ValueError(f"Could not geocode: {query!r} - try 'lat,lng' or a fuller address")
-    return float(j[0]["lat"]), float(j[0]["lon"])
+        ll = json.loads(p.read_text())
+        return float(ll[0]), float(ll[1])
+    failures = []
+    for name, fn in GEOCODERS:
+        try:
+            ll = fn(q)
+        except Exception as e:
+            failures.append(f"{name}: {str(e)[:60]}"); continue
+        if ll:
+            p.write_text(json.dumps([float(ll[0]), float(ll[1])]))
+            return float(ll[0]), float(ll[1])
+        failures.append(f"{name}: no match")
+    raise ValueError(f"Could not geocode {q!r} - try a fuller address or 'lat,lng' ({'; '.join(failures)})")
 
 
 def route_osrm(points):
