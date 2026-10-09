@@ -1008,9 +1008,13 @@ a{color:#8fc1ff;text-decoration:none}.note{padding:10px 16px;font-size:12.5px;co
 <div class="note">__NOTE_BOTTOM__</div>
 <script>
 const DATA=__DATA__; const MAIN=__MAIN__; const VAR=__VAR__; const HOME=__HOME__; const RINGS=__RINGS__;
-const map=L.map('map').setView(__CENTER__,__ZOOM__);
+const col={ER:'#ff5252',NIGHT:'#ffab2e',EXT:'#ffe14d',DAY:'#4d9bff',UNK:'#9aa3b2'};
+let map=null,markers={};
 // Basemap tiles: Esri and USGS serve embedded pages (Colab, Streamlit) without a key. OpenStreetMap's own tile
 // server refuses those frames ("Access blocked", 403) and CARTO watermarks them ("API KEY REQUIRED").
+// If the map engine cannot load (saved page opened with no signal), the table, filters and tap-to-call still work.
+try{
+map=L.map('map').setView(__CENTER__,__ZOOM__);
 const BASEMAPS={
  'Streets (Esri)':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles &copy; Esri'}),
  'Light gray (Esri)':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Tiles &copy; Esri'}),
@@ -1022,8 +1026,6 @@ L.control.layers(BASEMAPS,null,{position:'topright'}).addTo(map);
 if(MAIN.length>1) L.polyline(MAIN,{color:'#6ea8ff',weight:4,opacity:.9}).addTo(map);
 if(VAR.length>1) L.polyline(VAR,{color:'#6ea8ff',weight:3,opacity:.8,dashArray:'7 7'}).addTo(map);
 if(HOME){L.marker(HOME.ll).addTo(map).bindPopup('<b>HOME</b><br>'+HOME.label);RINGS.forEach(r=>L.circle(HOME.ll,{radius:r*1609,color:'#6ea8ff',weight:1.5,fill:false,dashArray:'4 6'}).addTo(map));}
-const col={ER:'#ff5252',NIGHT:'#ffab2e',EXT:'#ffe14d',DAY:'#4d9bff',UNK:'#9aa3b2'};
-let markers={};
 DATA.forEach((c,i)=>{
  const cur=c.source.indexOf('curated')===0;
  const m=L.circleMarker([c.lat,c.lng],{radius:c.typ==='ER'?9:6,color:cur?'#ffffff':'#0e1116',weight:cur?2:1.5,fillColor:col[c.typ],fillOpacity:.95}).addTo(map);
@@ -1031,6 +1033,7 @@ DATA.forEach((c,i)=>{
  m.bindPopup('<div class="pop"><b>'+c.name+'</b><br>'+c.town+' &middot; ~mi '+c.mile+' &middot; '+c.off+' mi off route<br><span class="t-'+c.typ+'">'+c.hours+'</span><br>&#9733; '+(c.rating||'&ndash;')+' &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><a target="_blank" href="'+gm+'">Open in Google Maps</a>'+(c.website?' &middot; <a target="_blank" href="'+c.website+'">website</a>':'')+'<br><span class="src">source: '+c.source+'</span></div>');
  markers[i]=m;
 });
+}catch(err){document.getElementById('map').innerHTML='<div class="note" style="padding:24px 16px">The map picture needs internet the first time it is opened. Everything below still works: filters, search, tap-to-call and Near me.</div>';}
 let F='ALL',Q='',sortK='mile',sortA=true,HERE=null,youMarker=null;
 function hav(a,b,c,d){const r=Math.PI/180,R=3958.76;const x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
 document.getElementById('near').onclick=()=>{
@@ -1038,9 +1041,7 @@ document.getElementById('near').onclick=()=>{
  navigator.geolocation.getCurrentPosition(p=>{
   HERE=[p.coords.latitude,p.coords.longitude];
   DATA.forEach(c=>{c.here=hav(HERE[0],HERE[1],c.lat,c.lng)});
-  if(youMarker)map.removeLayer(youMarker);
-  youMarker=L.marker(HERE).addTo(map).bindPopup('<b>You are here</b>');
-  map.setView(HERE,10);
+  if(map){if(youMarker)map.removeLayer(youMarker);youMarker=L.marker(HERE).addTo(map).bindPopup('<b>You are here</b>');map.setView(HERE,10);}
   const ers=DATA.filter(c=>c.typ==='ER'||c.typ==='NIGHT').sort((a,b)=>a.here-b.here).slice(0,3);
   const nb=document.getElementById('nearbox');nb.style.display='';
   nb.innerHTML='<b>Nearest overnight doors from where you are:</b> '+(ers.map(c=>c.name+' '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone')+' ('+c.here.toFixed(1)+' mi straight-line, <span class="t-'+c.typ+'">'+c.typ+'</span>)').join(' - ')||'none in this map')+'. Table is now sorted by distance from you.';
@@ -1055,9 +1056,9 @@ function render(){
  rows.forEach(c=>{
   const tr=document.createElement('tr');
   tr.innerHTML='<td>'+c.mile+'</td><td class="here" style="display:'+(HERE?'':'none')+'">'+(c.here!=null?c.here.toFixed(1)+' mi':'')+'</td><td>'+c.town+'</td><td>'+c.name+'</td><td class="t-'+c.typ+'">'+c.typ+'</td><td>'+c.off+' mi</td><td>'+c.hours+'</td><td>'+(c.rating||'&ndash;')+'</td><td>'+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'&ndash;')+'</td><td class="src">'+c.source+'</td>';
-  tr.onclick=()=>{map.setView([c.lat,c.lng],12);markers[c.i].openPopup();window.scrollTo({top:0,behavior:'smooth'})};
+  tr.onclick=()=>{if(map&&markers[c.i]){map.setView([c.lat,c.lng],12);markers[c.i].openPopup();window.scrollTo({top:0,behavior:'smooth'})}};
   tb.appendChild(tr);});
- DATA.forEach((c,i)=>{const s=(F==='ALL'||c.typ===F)&&(!Q||(c.town+' '+c.name).toLowerCase().includes(Q));
+ if(map) DATA.forEach((c,i)=>{const s=(F==='ALL'||c.typ===F)&&(!Q||(c.town+' '+c.name).toLowerCase().includes(Q));
   if(s){markers[i].addTo(map)}else{map.removeLayer(markers[i])}});
 }
 document.querySelectorAll('.btn[data-f]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.btn[data-f]').forEach(x=>x.classList.remove('on'));b.classList.add('on');F=b.dataset.f;render()});
@@ -1252,8 +1253,6 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
 
 # vetlocator | 9 pwa
 LEAFLET_CDN = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/"
-LEAFLET_FILES = ["leaflet.min.css", "leaflet.min.js", "images/marker-icon.png", "images/marker-icon-2x.png",
-                 "images/marker-shadow.png", "images/layers.png", "images/layers-2x.png"]
 
 
 def _fetch_bytes(url):
@@ -1279,6 +1278,29 @@ def _icon_png(size):
     buf = io.BytesIO(); im.save(buf, "PNG"); return buf.getvalue()
 
 
+def _leaflet_files():
+    """Leaflet as three flat files: CSS with its images folded in as data URIs, the JS, and a marker-icon shim."""
+    import base64
+    du = lambda name: "data:image/png;base64," + base64.b64encode(_fetch_bytes(LEAFLET_CDN + "images/" + name)).decode()
+    css = _fetch_bytes(LEAFLET_CDN + "leaflet.min.css").decode("utf-8")
+    for name in ("layers.png", "layers-2x.png", "marker-icon.png"):
+        css = css.replace("images/" + name, du(name))
+    js = _fetch_bytes(LEAFLET_CDN + "leaflet.min.js").decode("utf-8")
+    icons = json.dumps({"iconUrl": du("marker-icon.png"), "iconRetinaUrl": du("marker-icon-2x.png"), "shadowUrl": du("marker-shadow.png")})
+    return css, js, f'L.Icon.Default.imagePath="";L.Icon.Default.mergeOptions({icons});'
+
+
+# A map page built by the notebook or the Streamlit builder loads Leaflet from a CDN; inside the phone app the same
+# page is pointed at the app's own copy so it works with no signal.  The same rewrite runs in the browser on import.
+_LOCALIZE_JS = r"""function localizeMap(t){return t.replace(/<link rel="stylesheet" href="[^"]*leaflet[^"]*\.css"\/?>/,'<link rel="stylesheet" href="./leaflet.css">').replace(/<script src="[^"]*leaflet[^"]*\.js"><\/script>/,'<script src="./leaflet.js"><\/script><script src="./leaflet-icons.js"><\/script>')}"""
+
+
+def _localize_map(page):
+    page = re.sub(r'<link rel="stylesheet" href="[^"]*leaflet[^"]*\.css"/?>', '<link rel="stylesheet" href="./leaflet.css">', page, count=1)
+    page = re.sub(r'<script src="[^"]*leaflet[^"]*\.js"></script>', '<script src="./leaflet.js"></script><script src="./leaflet-icons.js"></script>', page, count=1)
+    return page.replace("<header>", '<header><a href="./index.html" style="color:#8fc1ff;font-size:13px;text-decoration:none">&larr; back</a>', 1)
+
+
 _PWA_HEAD = r"""<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="./manifest.webmanifest"><meta name="theme-color" content="#151a22">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
@@ -1290,39 +1312,59 @@ header{padding:14px 16px 10px;background:#151a22;border-bottom:2px solid #2a3140
 header img{width:34px;height:34px;border-radius:8px}
 h1{margin:0;font-size:20px;color:#ffd94d}.sub{color:#9aa3b2;font-size:12.5px;margin-top:2px}
 main{padding:12px 16px 24px;max-width:720px}
-.btn{display:block;text-align:center;background:#ff5252;color:#fff;font-weight:700;font-size:17px;border-radius:14px;padding:16px;margin:10px 0;text-decoration:none;border:0;width:100%;box-sizing:border-box;cursor:pointer}
-.btn.blue{background:#2f6fd6}.btn.grey{background:#1d2430;border:1px solid #3a4356;color:#e8eaee;font-weight:600}
-h2{font-size:14px;color:#9aa3b2;font-weight:600;margin:18px 0 6px;text-transform:none}
-a.card{display:block;background:#1a212c;border:1px solid #2a3140;border-radius:12px;padding:12px 14px;margin:8px 0;color:#e8eaee;text-decoration:none}
-a.card b{display:block;font-size:15px;color:#fff}a.card span{color:#9aa3b2;font-size:12.5px}
+.btn{display:block;text-align:center;background:#ff5252;color:#fff;font-weight:700;font-size:17px;border-radius:14px;padding:16px;margin:10px 0;text-decoration:none;border:0;width:100%;box-sizing:border-box;cursor:pointer;font-family:inherit}
+.btn.blue{background:#2f6fd6}.btn.grey{background:#1d2430;border:1px solid #3a4356;color:#e8eaee;font-weight:600;font-size:15px;padding:12px}
+h2{font-size:14px;color:#9aa3b2;font-weight:600;margin:18px 0 6px}
+.card{display:block;background:#1a212c;border:1px solid #2a3140;border-radius:12px;padding:12px 14px;margin:8px 0;color:#e8eaee;text-decoration:none;position:relative}
+.card b{display:block;font-size:15px;color:#fff;padding-right:60px}.card span{color:#9aa3b2;font-size:12.5px}
+.card .rm{position:absolute;right:12px;top:12px;color:#9aa3b2;font-size:12px;background:none;border:1px solid #3a4356;border-radius:8px;padding:4px 8px;cursor:pointer}
 #near{display:none;background:#1a212c;border:1px solid #ffab2e;border-radius:12px;padding:12px 14px;margin:8px 0;font-size:14px;line-height:1.5}
 #near a{color:#8fc1ff;text-decoration:none;font-weight:700}
 .t-ER{color:#ff6b6b;font-weight:700}.t-NIGHT{color:#ffb84d;font-weight:700}
 .status{font-size:12.5px;color:#9aa3b2;padding:10px 0 0;line-height:1.5}.status b{color:#7fe0a0}.status i{color:#ffb84d;font-style:normal}
+.status a,.sub a{color:#8fc1ff;text-decoration:none}
 .off{display:none;background:#3a2a1a;border:1px solid #ffab2e;color:#ffd9a0;border-radius:10px;padding:10px 12px;font-size:13px;margin:8px 0}
 body.offline .off{display:block}body.offline .btn.blue{opacity:.45;pointer-events:none}
+.empty{color:#9aa3b2;font-size:13px;line-height:1.5;padding:4px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:#ffd94d;padding:8px 6px;border-bottom:2px solid #2a3140;position:sticky;top:0;background:#1a212c}
+td{padding:7px 6px;border-bottom:1px solid #232a36;vertical-align:top}td a{color:#8fc1ff;text-decoration:none}
 </style>"""
 
-_PWA_INDEX = r"""<!DOCTYPE html><html><head><title>__TITLE__</title>__HEAD__</head><body>
+_PWA_INDEX = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__</title>__HEAD__</head><body>
 <header><img src="./icon-192.png" alt=""><div><h1>__TITLE__</h1><div class="sub">__SUB__</div></div></header>
 <main>
-<div class="off">No signal - the live builder needs internet. Saved maps and Near me still work.</div>
+<div class="off">No signal - the live builder needs internet. Your saved maps, the verified list and Near me still work.</div>
 <button class="btn" id="nearbtn">&#9673; Nearest overnight doors to me now</button>
 <div id="near"></div>
 __LIVE__
-<h2>Saved maps - work without signal</h2>
-__CARDS__
-<div class="status" id="st">To keep this on your phone: Safari share button &rarr; <b>Add to Home Screen</b>; Chrome &#8942; &rarr; <b>Add to Home screen</b>. The saved maps are stored on the phone after the first open. Map tiles only where you have viewed them online; the clinic tables, tap-to-call and Near me never need signal.</div>
+<h2>My maps - saved on this phone only</h2>
+<div id="mymaps"></div>
+<div class="empty" id="mmhelp">Build a map in the live builder, tap <b>Save the map</b> there, then add the saved file here. It stays on this phone; nobody else can see it.</div>
+<label class="btn grey" for="addmap">+ Add a saved map file</label><input id="addmap" type="file" accept=".html,text/html" style="display:none">
+__BUILTIN__
+<div class="status" id="st">To keep this on your phone: Safari share button &rarr; <b>Add to Home Screen</b>; Chrome &#8942; &rarr; <b>Add to Home screen</b>. Map tiles need internet the first time; clinic tables, tap-to-call and Near me never do. <a href="./privacy.html">Privacy</a></div>
 </main>
 <script>
-const MAPS=__MAPFILES__;
+__LOCALIZE__
 function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}
 window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').then(()=>{document.getElementById('st').insertAdjacentHTML('afterbegin','<b>Saved on this phone.</b> ')}).catch(()=>{});}
 function hav(a,b,c,d){const r=Math.PI/180,R=3958.76;const x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
-async function allClinics(){const seen={},out=[];
- for(const f of MAPS){try{const t=await (await fetch('./'+f)).text();const m=t.match(/const DATA=(\[[\s\S]*?\]); const MAIN=/);if(!m)continue;
-  for(const c of JSON.parse(m[1])){const k=c.name+'|'+c.lat.toFixed(3);if(!seen[k]){seen[k]=1;out.push(c);}}}catch(e){}}
+const idx=()=>{try{return JSON.parse(localStorage.getItem('mymaps')||'[]')}catch(e){return []}};
+const saveIdx=l=>localStorage.setItem('mymaps',JSON.stringify(l));
+function renderMine(){const l=idx(),box=document.getElementById('mymaps');box.innerHTML=l.map(m=>'<a class="card" href="./map-'+m.id+'.html"><b>'+m.title+'</b><span>'+m.sub+'</span><button class="rm" data-id="'+m.id+'">remove</button></a>').join('');
+ document.getElementById('mmhelp').style.display=l.length?'none':'';
+ box.querySelectorAll('.rm').forEach(b=>b.onclick=async e=>{e.preventDefault();const id=b.dataset.id;const c=await caches.open('mymaps');await c.delete('./map-'+id+'.html');saveIdx(idx().filter(m=>m.id!==id));renderMine();});}
+document.getElementById('addmap').onchange=async e=>{const f=e.target.files[0];if(!f)return;let t=await f.text();
+ if(t.indexOf('const DATA=')<0){alert('That is not a map saved from the vet locator builder.');return;}
+ t=localizeMap(t);const id=(Date.now().toString(36)+Math.random().toString(36).slice(2,7));
+ const c=await caches.open('mymaps');await c.put(new Request('./map-'+id+'.html'),new Response(t,{headers:{'Content-Type':'text/html; charset=utf-8'}}));
+ const ti=(t.match(/<title>(.*?)<\/title>/)||[])[1]||f.name,su=(t.match(/<div class="sub">(.*?)<\/div>/)||[])[1]||'';
+ const l=idx();l.push({id,title:ti,sub:su.replace(/<[^>]+>/g,'').slice(0,120)});saveIdx(l);renderMine();e.target.value='';};
+renderMine();
+async function allClinics(){const seen={},out=[];const add=c=>{const k=c.name+'|'+(+c.lat).toFixed(3);if(!seen[k]){seen[k]=1;out.push(c);}};
+ try{const b=await (await fetch('./builtin.json')).json();b.forEach(c=>{c.source='verified';add(c)});}catch(e){}
+ try{const c=await caches.open('mymaps');for(const m of idx()){const r=await c.match('./map-'+m.id+'.html');if(!r)continue;const t=await r.text();const mm=t.match(/const DATA=(\[[\s\S]*?\]); const MAIN=/);if(mm)JSON.parse(mm[1]).forEach(add);}}catch(e){}
  return out;}
 document.getElementById('nearbtn').onclick=()=>{
  const box=document.getElementById('near');box.style.display='block';box.innerHTML='Getting your location...';
@@ -1332,26 +1374,42 @@ document.getElementById('nearbtn').onclick=()=>{
   all.forEach(c=>c.d=hav(la,lo,c.lat,c.lng));
   const over=all.filter(c=>c.typ==='ER'||c.typ==='NIGHT').sort((a,b)=>a.d-b.d).slice(0,4);
   const any=all.filter(c=>c.typ!=='ER'&&c.typ!=='NIGHT').sort((a,b)=>a.d-b.d).slice(0,3);
-  const row=c=>'<div><b>'+c.name+'</b> <span class="t-'+c.typ+'">'+c.typ+'</span> &middot; '+c.d.toFixed(1)+' mi straight-line &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><span style="color:#9aa3b2;font-size:12.5px">'+c.town+' &middot; '+c.hours+'</span></div>';
-  box.innerHTML=(over.length?'<div style="color:#ffd94d;font-weight:700;margin-bottom:4px">Overnight doors nearest you</div>'+over.map(row).join('<hr style="border:0;border-top:1px solid #2a3140;margin:6px 0">'):'<div>No 24/7 or night clinic in the saved maps near here.</div>')
-   +(any.length?'<div style="color:#ffd94d;font-weight:700;margin:10px 0 4px">Nearest daytime clinics</div>'+any.map(row).join('<hr style="border:0;border-top:1px solid #2a3140;margin:6px 0">'):'')
-   +'<div style="color:#9aa3b2;font-size:12px;margin-top:8px">From the '+all.length+' clinics in your saved maps. Call before driving - hours change.</div>';
+  const row=c=>'<div><b>'+c.name+'</b> <span class="t-'+c.typ+'">'+c.typ+'</span> &middot; '+c.d.toFixed(1)+' mi straight-line &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><span style="color:#9aa3b2;font-size:12.5px">'+(c.town||'')+' &middot; '+c.hours+'</span></div>';
+  const hr='<hr style="border:0;border-top:1px solid #2a3140;margin:6px 0">';
+  box.innerHTML=(over.length?'<div style="color:#ffd94d;font-weight:700;margin-bottom:4px">Overnight doors nearest you</div>'+over.map(row).join(hr):'<div>No 24/7 or night clinic known near here. Add a map of your area for better coverage.</div>')
+   +(any.length?'<div style="color:#ffd94d;font-weight:700;margin:10px 0 4px">Nearest daytime clinics</div>'+any.map(row).join(hr):'')
+   +'<div style="color:#9aa3b2;font-size:12px;margin-top:8px">From '+all.length+' clinics: the built-in verified list plus your saved maps. Call before driving - hours change.</div>';
  },()=>{box.innerHTML='Location unavailable - allow location access for this app and try again.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
 };
 </script></body></html>"""
 
-_PWA_LIVE = r"""<!DOCTYPE html><html><head><title>__TITLE__ - live builder</title>__HEAD__
-<style>html,body{height:100%}body{display:flex;flex-direction:column}header{flex:0 0 auto}iframe{flex:1 1 auto;border:0;width:100%}
+_PWA_LIVE = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - live builder</title>__HEAD__
+<style>html,body{height:100%}body{display:flex;flex-direction:column}iframe{flex:1 1 auto;border:0;width:100%}
 .bar{padding:8px 16px;background:#151a22;border-bottom:1px solid #2a3140;font-size:13px}.bar a{color:#8fc1ff;text-decoration:none}</style></head>
-<body><div class="bar"><a href="./index.html">&larr; Saved maps &amp; Near me</a> &nbsp;&middot;&nbsp; <a href="__APP__" target="_blank">open in browser</a></div>
-<div class="off" style="margin:8px 16px">No signal - the live builder needs internet. <a href="./index.html" style="color:#ffd94d">Use the saved maps</a>.</div>
-<iframe src="__APP__?embed=true" allow="geolocation; clipboard-write" title="Vet locator"></iframe>
+<body><div class="bar"><a href="./index.html">&larr; My maps &amp; Near me</a> &nbsp;&middot;&nbsp; <a href="__APP__" target="_blank">open in browser</a></div>
+<div class="off" style="margin:8px 16px">No signal - the live builder needs internet. <a href="./index.html" style="color:#ffd94d">Use your saved maps</a>.</div>
+<iframe src="__APP__?embed=true" allow="geolocation; clipboard-write" title="Vet locator builder"></iframe>
 <script>function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();</script>
 </body></html>"""
 
+_PWA_VERIFIED = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - verified overnight clinics</title>__HEAD__</head>
+<body><header><div><h1>Verified 24/7 and night clinics</h1><div class="sub"><a href="./index.html">&larr; back</a> &middot; __N__ clinics checked by hand against their listings (__STAMP__). Call before driving - hours change.</div></div></header>
+<main><table><thead><tr><th>Town</th><th>Clinic</th><th>Hours</th><th>Call</th></tr></thead><tbody>__ROWS__</tbody></table></main></body></html>"""
+
+_PWA_PRIVACY = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - privacy</title>__HEAD__</head>
+<body><header><div><h1>Privacy</h1><div class="sub"><a href="./index.html">&larr; back</a></div></div></header>
+<main style="font-size:14px;line-height:1.6">
+<p><b>__TITLE__</b> does not collect, store or transmit personal information, and has no accounts.</p>
+<p><b>Location.</b> When you tap "Nearest overnight doors to me now" or "Near me", the app asks the phone for its position and uses it on the phone to sort clinics by distance. The position is not sent anywhere and is not kept.</p>
+<p><b>Saved maps.</b> Maps you add are stored in this app's own storage on your phone. They are not uploaded. Removing the app removes them.</p>
+<p><b>Third-party services.</b> Map background tiles are requested from Esri and the U.S. Geological Survey when you look at a map with internet access; those requests carry the map area being viewed. The live builder (__APPHOST__) is a separate web page: addresses you type there are sent to routing and geocoding services (OSRM, U.S. Census Bureau, ArcGIS, Photon, OpenStreetMap) and, when configured, Google Places, to produce the map. It stores nothing about you beyond temporary caching needed to build the map.</p>
+<p><b>Clinic information</b> comes from public listings and is provided as a convenience; always call ahead. Nothing here is veterinary advice.</p>
+<p>Contact: __CONTACT__</p>
+</main></body></html>"""
+
 _PWA_SW = r"""const VERSION='__VERSION__';const PRECACHE=__PRECACHE__;
-self.addEventListener('install',e=>{e.waitUntil(caches.open('vet-'+VERSION).then(c=>c.addAll(PRECACHE)).then(()=>self.skipWaiting()))});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!=='vet-'+VERSION&&k!=='tiles').map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
+self.addEventListener('install',e=>{e.waitUntil(caches.open('vet-'+VERSION).then(c=>Promise.allSettled(PRECACHE.map(u=>c.add(u)))).then(()=>self.skipWaiting()))});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!=='vet-'+VERSION&&k!=='tiles'&&k!=='mymaps').map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 async function trim(c){const keys=await c.keys();if(keys.length>2500){for(const k of keys.slice(0,300))await c.delete(k);}}
 self.addEventListener('fetch',e=>{
  const u=new URL(e.request.url);
@@ -1360,58 +1418,76 @@ self.addEventListener('fetch',e=>{
    try{const r=await fetch(e.request);c.put(e.request,r.clone());trim(c);return r;}catch(err){return new Response('',{status:504});}}));
   return;}
  if(u.origin===self.location.origin){
-  e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(hit=>hit||fetch(e.request).then(r=>{if(r.ok){const cp=r.clone();caches.open('vet-'+VERSION).then(c=>c.put(e.request,cp));}return r;})));
+  e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(hit=>hit||fetch(e.request).then(r=>{if(r.ok&&u.pathname.indexOf('/map-')<0){const cp=r.clone();caches.open('vet-'+VERSION).then(c=>c.put(e.request,cp));}return r;})));
  }
 });"""
 
 
-def build_pwa(map_files, out_dir="pwa", title="Vet maps", subtitle="", app_url="", short_name="Vet maps"):
-    """Packages finished map pages as an installable phone app folder: the maps (Leaflet served locally instead of
-    from a CDN), a home page with a 'nearest overnight doors to me' button that searches every saved map, a page
-    that embeds the live Streamlit builder (app_url) when there is signal, a manifest, icons and a service worker
-    that stores everything on the phone at first open.  Host the folder on any static site (GitHub Pages is free)."""
-    out = pathlib.Path(out_dir); (out / "leaflet" / "images").mkdir(parents=True, exist_ok=True)
-    for f in LEAFLET_FILES:
-        (out / "leaflet" / f.replace(".min", "")).write_bytes(_fetch_bytes(LEAFLET_CDN + f))
+def build_pwa(map_files=(), out_dir="pwa", title="Vet locator", subtitle="", app_url="", short_name="Vet locator",
+              builtin=None, description="", contact="", stamp="Sept 2026"):
+    """Packages the phone app as a flat folder (nothing to lose in an upload).  Each person's maps are added on their
+    own phone and stay there; map_files are optional preloaded maps for a personal build.  builtin is a DataFrame of
+    verified overnight clinics (name, town, lat, lng, phone, hours, typ) that powers 'Nearest overnight doors' from
+    the first open.  app_url is the live Streamlit builder.  Host the folder on any static site (GitHub Pages is free)."""
+    out = pathlib.Path(out_dir); out.mkdir(parents=True, exist_ok=True)
+    css, js, icon_js = _leaflet_files()
+    (out / "leaflet.css").write_text(css, encoding="utf-8"); (out / "leaflet.js").write_text(js, encoding="utf-8")
+    (out / "leaflet-icons.js").write_text(icon_js, encoding="utf-8")
     head = _PWA_HEAD.replace("__SHORT__", _esc(short_name))
-    cards, names, digest = [], [], hashlib.md5()
-    pre = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"] + \
-          ["./leaflet/" + f.replace(".min", "") for f in LEAFLET_FILES]
+    digest = hashlib.md5()
+    pre = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./leaflet.css", "./leaflet.js",
+           "./leaflet-icons.js", "./privacy.html"]
+    cards = []
     for mf in map_files:
-        src = pathlib.Path(mf); page = src.read_text(encoding="utf-8")
-        page = (page.replace(LEAFLET_CDN + "leaflet.min.css", "./leaflet/leaflet.css")
-                    .replace(LEAFLET_CDN + "leaflet.min.js", "./leaflet/leaflet.js")
-                    .replace("<header>", '<header><a href="./index.html" style="color:#8fc1ff;font-size:13px;text-decoration:none">&larr; all maps</a>', 1))
-        (out / src.name).write_text(page, encoding="utf-8"); digest.update(page.encode())
+        src = pathlib.Path(mf); page = _localize_map(src.read_text(encoding="utf-8"))
+        (out / src.name).write_text(page, encoding="utf-8"); digest.update(page.encode()); pre.append("./" + src.name)
         t = re.search(r"<title>(.*?)</title>", page); s = re.search(r'<div class="sub">(.*?)</div>', page)
         cards.append(f'<a class="card" href="./{src.name}"><b>{t.group(1) if t else src.name}</b><span>{s.group(1) if s else ""}</span></a>')
-        pre.append("./" + src.name); names.append(src.name)
+    builtin_html = ""
+    if builtin is not None and len(builtin):
+        rows = [{k: ("" if pd.isna(v) else v) for k, v in r.items()} for r in builtin[["name", "town", "lat", "lng", "phone", "hours", "typ"]].to_dict("records")]
+        (out / "builtin.json").write_text(json.dumps(rows, separators=(",", ":")), encoding="utf-8"); pre.append("./builtin.json")
+        trs = "".join(f'<tr><td>{_esc(r["town"])}</td><td><b>{_esc(r["name"])}</b></td><td class="t-{r["typ"]}">{_esc(r["hours"])}</td>'
+                      f'<td>{("<a href=tel:" + r["phone"] + ">" + r["phone"] + "</a>") if r["phone"] else "-"}</td></tr>'
+                      for r in sorted(rows, key=lambda r: (str(r["town"])[-2:], str(r["town"]), r["name"])))
+        (out / "verified.html").write_text(_PWA_VERIFIED.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__N__", str(len(rows)))
+                                           .replace("__STAMP__", _esc(stamp)).replace("__ROWS__", trs), encoding="utf-8"); pre.append("./verified.html")
+        builtin_html = (f'<h2>Built in</h2><a class="card" href="./verified.html"><b>{len(rows)} verified 24/7 and night clinics</b>'
+                        f'<span>Hand-checked listings ({_esc(stamp)}) along Denver metro, I-80/I-69 to Michigan and I-25/US-287/I-45 to Houston. '
+                        f'Used by Near me from the first open.</span></a>')
+        digest.update(json.dumps(rows).encode())
+    if cards:
+        builtin_html = '<h2>Preloaded maps</h2>' + "\n".join(cards) + builtin_html
     live = ""
     if app_url:
         (out / "live.html").write_text(_PWA_LIVE.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__APP__", _esc(app_url.rstrip("/"))), encoding="utf-8")
         pre.append("./live.html")
         live = '<a class="btn blue" href="./live.html">Plan a trip or home map (live, needs signal)</a>'
     (out / "index.html").write_text(_PWA_INDEX.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__SUB__", subtitle)
-                                    .replace("__CARDS__", "\n".join(cards)).replace("__LIVE__", live)
-                                    .replace("__MAPFILES__", json.dumps(names)), encoding="utf-8")
+                                    .replace("__LIVE__", live).replace("__BUILTIN__", builtin_html).replace("__LOCALIZE__", _LOCALIZE_JS), encoding="utf-8")
+    apphost = re.sub(r"^https?://", "", app_url).rstrip("/") if app_url else "the builder"
+    (out / "privacy.html").write_text(_PWA_PRIVACY.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__APPHOST__", _esc(apphost))
+                                      .replace("__CONTACT__", _esc(contact or "the app publisher")), encoding="utf-8")
     (out / "manifest.webmanifest").write_text(json.dumps({
-        "name": title, "short_name": short_name, "start_url": "./index.html", "scope": "./", "display": "standalone",
-        "background_color": "#0e1116", "theme_color": "#151a22",
-        "icons": [{"src": "./icon-192.png", "sizes": "192x192", "type": "image/png"},
-                  {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]}, indent=1), encoding="utf-8")
+        "id": "./", "name": title, "short_name": short_name, "description": description or subtitle,
+        "start_url": "./index.html", "scope": "./", "display": "standalone", "orientation": "portrait", "lang": "en-US",
+        "background_color": "#0e1116", "theme_color": "#151a22", "categories": ["medical", "navigation", "travel"],
+        "icons": [{"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                  {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                  {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}, indent=1), encoding="utf-8")
     (out / "icon-192.png").write_bytes(_icon_png(192)); (out / "icon-512.png").write_bytes(_icon_png(512))
-    digest.update(app_url.encode())
+    (out / ".nojekyll").write_text("", encoding="utf-8")
+    digest.update(app_url.encode()); digest.update(_PWA_INDEX.encode())
     (out / "sw.js").write_text(_PWA_SW.replace("__VERSION__", digest.hexdigest()[:10]).replace("__PRECACHE__", json.dumps(pre)), encoding="utf-8")
     (out / "README.md").write_text(
-        f"# {title} - phone app\n\nA static web app: host this folder and open it on a phone.\n\n"
+        f"# {title} - phone app\n\nA static web app: host this folder and open it on a phone. Everyone's maps are added on their own phone and stay there.\n\n"
         "## Put it online with GitHub Pages (free)\n\n"
-        "1. Create a **public** repository on GitHub (Pages is free only for public repos) and upload everything in this folder, "
-        "including the `leaflet` sub-folder, with **Add file -> Upload files**.\n"
+        "1. Create a **public** repository on GitHub and upload every file in this folder (loose files, no sub-folders) with **Add file -> Upload files**. "
+        "`.nojekyll` is a hidden file; if the upload box skips it, create it with Add file -> Create new file (empty).\n"
         "2. Repository **Settings -> Pages -> Build and deployment -> Source: Deploy from a branch**, branch `main`, folder `/ (root)`, **Save**.\n"
-        "3. After a minute the same page shows the address, e.g. `https://<user>.github.io/<repo>/`. Open it on the phone.\n"
-        "4. Add it to the home screen (Safari: share -> Add to Home Screen; Chrome: menu -> Add to Home screen). "
-        "From then on it opens like an app; the saved maps and Near me work without signal, the live builder when there is one.\n\n"
-        "To update: rebuild in the notebook, upload the new files over the old ones. Phones pick up the new version on their next online open.\n\n"
-        "App-store version: https://www.pwabuilder.com packages a hosted app like this one into Android and iOS store submissions.\n",
+        "3. After a minute the same page shows the address, e.g. `https://<user>.github.io/<repo>/`. Open it on the phone and add it to the home screen.\n\n"
+        "## Adding a map on a phone\n\nBuild it in the live builder, tap **Save the map**, then on the app's home page tap **Add a saved map file** and pick the file. "
+        "It is stored on that phone only and works without signal.\n\n"
+        "## Store listing\n\nhttps://www.pwabuilder.com packages this hosted app for Google Play and the App Store; `privacy.html` is the privacy policy page the stores ask for.\n",
         encoding="utf-8")
     return sorted(str(p.relative_to(out)) for p in out.rglob("*") if p.is_file())

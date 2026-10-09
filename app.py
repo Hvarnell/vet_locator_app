@@ -39,8 +39,8 @@ mode = st.radio("What do you need?", ["Driving corridor", "Home base"], horizont
 
 with st.form("inputs", border=True):
     if mode == "Driving corridor":
-        origin = st.text_input("From", "5341 W 82nd Ave, Westminster, CO")
-        destination = st.text_input("To", "League City, TX")
+        origin = st.text_input("From", "", placeholder="Street address or town, e.g. Denver, CO")
+        destination = st.text_input("To", "", placeholder="e.g. Flint, MI")
         with st.expander("Shape the route (optional)"):
             via_txt = st.text_input("Via (comma-separated towns)", "")
             variant_txt = st.text_input("Variant route via (drawn dashed)", "")
@@ -50,7 +50,7 @@ with st.form("inputs", border=True):
             corridor_mi = st.slider("Keep every clinic within (miles of the road)", 3, 30, 12)
             er_reach_mi = st.slider("Keep 24/7 and night clinics out to (miles)", 15, 80, 45)
     else:
-        home = st.text_input("Home address", "5341 W 82nd Ave, Westminster, CO")
+        home = st.text_input("Home address", "", placeholder="Street address or town")
         radius_mi = st.slider("Radius (miles)", 5, 40, 15)
     with st.expander("Data settings"):
         provider = st.selectbox("Live data source", ["auto", "google", "osm"],
@@ -92,6 +92,12 @@ def _show_page(page_html, height=900):
 
 
 if go:
+    needed = [origin, destination] if mode == "Driving corridor" else [home]
+    if mode == "Driving corridor" and (google_link.strip() or track_file is not None):
+        needed = []
+    if any(not v.strip() for v in needed):
+        st.warning("Enter the address or town first." if mode == "Home base" else "Enter both From and To (or a Google Maps link / GPX file under Shape the route).")
+        st.stop()
     try:
         with st.spinner("Routing, pulling clinics and building the map (30 s to a few minutes for a long corridor)..."):
             if mode == "Driving corridor":
@@ -128,7 +134,7 @@ if go:
     _show_page(res["html"])
 
     d1, d2 = st.columns(2)
-    d1.download_button("Save the map (HTML, works offline)", res["html"], file_name=fname + ".html", mime="text/html", use_container_width=True)
+    d1.download_button("Save the map (HTML - add it to the phone app under My maps)", res["html"], file_name=fname + ".html", mime="text/html", use_container_width=True)
     d2.download_button("Save the table (CSV)", df.drop(columns=["er_hint"], errors="ignore").to_csv(index=False),
                        file_name=fname + ".csv", mime="text/csv", use_container_width=True)
 
