@@ -1,5 +1,5 @@
-[server] 
-enableStaticServing = true 
+[server]
+enableStaticServing = true
 
-[theme] 
+[theme]
 base = "dark"
