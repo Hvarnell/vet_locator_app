@@ -1,6 +1,6 @@
 """Vet locator library - generated from harley_vet_locator.ipynb; edit the notebook, not this file."""
 # vetlocator | 1 config
-import os, re, json, math, time, html, hashlib, pathlib, datetime, difflib
+import os, re, json, math, time, html, hashlib, pathlib, datetime, difflib, urllib.parse
 import numpy as np
 import pandas as pd
 import requests
@@ -164,6 +164,45 @@ def locate_on_route(df, route, chunk=200):
         miles[i:i + chunk] = rs["cum_mi"][k]; offs[i:i + chunk] = d[np.arange(len(k)), k]
     out = df.copy(); out["mile"] = np.round(miles).astype(int); out["off"] = np.round(offs, 1)
     return out
+
+
+def waypoints_from_google_link(url):
+    """The stops in a Google Maps directions link (long form or a maps.app.goo.gl share link) -> list of places.
+    Google does not publish its exact road choice, but the stops you add in Google Maps are the shape of the route."""
+    u = str(url).strip()
+    if "goo.gl" in u or "maps.app" in u:
+        u = requests.get(u, headers={"User-Agent": UA}, timeout=20, allow_redirects=True).url
+    m = re.search(r"/maps/dir/([^?#]*)", u)
+    if not m:
+        raise ValueError("Not a Google Maps directions link (expected .../maps/dir/stop1/stop2/...)")
+    stops = [urllib.parse.unquote_plus(seg).strip() for seg in m.group(1).split("/")]
+    stops = [x for x in stops if x and not x.startswith(("@", "data=", "am="))]
+    if len(stops) < 2:
+        raise ValueError("The link has fewer than two stops")
+    return stops
+
+
+def route_from_track(xml_text):
+    """A GPX track/route or KML LineString (Google My Maps 'Export to KML', Garmin, Gaia, ...) -> route dict.
+    The file's own line is used; nothing is re-routed."""
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(xml_text)
+    pts, wpts = [], []
+    for el in root.iter():
+        tag = el.tag.split("}")[-1]
+        if tag in ("trkpt", "rtept"):
+            pts.append((float(el.get("lat")), float(el.get("lon"))))
+        elif tag == "wpt":
+            wpts.append((float(el.get("lat")), float(el.get("lon"))))
+        elif tag == "coordinates" and el.text:
+            for tok in el.text.split():
+                lng, lat = tok.split(",")[:2]; pts.append((float(lat), float(lng)))
+    pts = pts or wpts
+    if len(pts) < 2:
+        raise ValueError("No track, route or LineString found in the file")
+    lat = np.array([q[0] for q in pts]); lng = np.array([q[1] for q in pts])
+    seg = haversine_mi(lat[:-1], lng[:-1], lat[1:], lng[1:]); cum = np.concatenate([[0.0], np.cumsum(seg)])
+    return {"lat": lat, "lng": lng, "cum_mi": cum, "total_mi": float(cum[-1]), "drive_h": float(cum[-1]) / 55.0}
 
 # vetlocator | 3 hours
 # One schedule format for every source: {day 0..6 (Mon..Sun): [(open_min, close_min, is_24h), ...]}
@@ -779,8 +818,9 @@ def _google_post(url, body):
 
 def _google_row(pl):
     name = pl.get("displayName", {}).get("text", "")
-    if not name or pl.get("businessStatus", "OPERATIONAL") != "OPERATIONAL":
+    if not name:
         return None
+    status = pl.get("businessStatus", "OPERATIONAL")
     hrs = pl.get("regularOpeningHours") or {}
     sched = parse_google_periods(hrs.get("periods"))
     wd = hrs.get("weekdayDescriptions") or []
@@ -793,12 +833,15 @@ def _google_row(pl):
             "phone": _fmt_phone(pl.get("nationalPhoneNumber")), "hours": hours, "hours_raw": hours_raw, "typ": typ,
             "rating": (f"{pl['rating']:.1f}" if pl.get("rating") is not None else ""), "town": town,
             "website": pl.get("websiteUri", ""), "maps_url": pl.get("googleMapsUri", ""), "source": "Google",
-            "ext_id": pl.get("id", ""), "er_hint": bool(NAME_ER_RE.search(name))}
+            "ext_id": pl.get("id", ""), "er_hint": bool(NAME_ER_RE.search(name)),
+            "closed": "" if status == "OPERATIONAL" else status.replace("_", " ").lower()}
 
 
-def fetch_google(centers, radius_mi=15, er_reach_mi=45):
-    """Two passes per centre: Nearby (veterinary_care, nearest 20 within radius_mi) and Text ('24 hour emergency
-    veterinary hospital', biased to er_reach_mi) so metro ERs are not crowded out by the 20-result cap."""
+def fetch_google(centers, radius_mi=15, er_reach_mi=45, er_every=3):
+    """Nearby search (veterinary_care, nearest 20 within radius_mi) at every centre, plus a text search for
+    '24 hour emergency veterinary hospital' at every er_every-th centre biased to er_reach_mi, so metro ERs are not
+    crowded out by the 20-result cap.  Hours/phone/rating fields put every call in Google's Enterprise tier
+    (1,000 free calls a month): a 1,000-mile corridor is about 85 calls."""
     if not GOOGLE_MAPS_API_KEY:
         raise RuntimeError("Set GOOGLE_MAPS_API_KEY (environment variable) to use Google Places.")
     rows = {}
@@ -809,19 +852,16 @@ def fetch_google(centers, radius_mi=15, er_reach_mi=45):
         for pl in _google_post(PLACES_NEARBY_URL, body).get("places", []):
             r = _google_row(pl)
             if r: rows[r["ext_id"]] = r
-    for (lat, lng) in centers[::2] + centers[-1:]:
-        token = None
-        for _ in range(3):
-            body = {"textQuery": "24 hour emergency veterinary hospital", "pageSize": 20,
-                    "locationBias": {"circle": {"center": {"latitude": lat, "longitude": lng},
-                                                "radius": min(er_reach_mi * 1609.34, 50000.0)}}}
-            if token: body["pageToken"] = token
-            j = _google_post(PLACES_TEXT_URL, body)
-            for pl in j.get("places", []):
-                r = _google_row(pl)
-                if r: rows[r["ext_id"]] = r
-            token = j.get("nextPageToken")
-            if not token: break
+    er_centers = list(centers[::max(1, er_every)])
+    if centers[-1] not in er_centers:
+        er_centers.append(centers[-1])
+    for (lat, lng) in er_centers:
+        body = {"textQuery": "24 hour emergency veterinary hospital", "pageSize": 20,
+                "locationBias": {"circle": {"center": {"latitude": lat, "longitude": lng},
+                                            "radius": min(er_reach_mi * 1609.34, 50000.0)}}}
+        for pl in _google_post(PLACES_TEXT_URL, body).get("places", []):
+            r = _google_row(pl)
+            if r: rows[r["ext_id"]] = r
     return pd.DataFrame(list(rows.values()))
 
 
@@ -837,9 +877,43 @@ def _norm(s):
     return " ".join(s.split())
 
 
+def _curated_note(hours_text):
+    """The human notes riding on a hand-verified hours string - '(GP + urgent care, surgery)', 'CALL FIRST',
+    'LIMITED:' - kept when Google supplies the schedule itself."""
+    t = str(hours_text or "")
+    parts = []
+    lead = re.match(r"\s*([A-Z][A-Z ]{2,}):", t)
+    if lead and ("LIMITED" in lead.group(1) or "CALL" in lead.group(1)):
+        parts.append(lead.group(1))
+    m = re.search(r"\s(\(|-\s|\+\s|—\s)", t)
+    if m:
+        tail = t[m.start():].strip(" -+—")
+        if tail:
+            parts.append(tail)
+    return " ".join(parts)
+
+
+def _refresh_from_google(dup, r):
+    """A hand-verified row met its Google listing: take Google's current hours, type, rating and phone, keep the
+    name, town and notes.  A listing Google marks closed is flagged, not silently kept."""
+    note = _curated_note(dup.get("hours_raw") or dup.get("hours"))
+    if r.get("closed"):
+        dup["hours"] = f"{r['closed']} on Google - verify before relying on this" + (f" · {note}" if note else "")
+        dup["typ"] = "UNK"
+    elif r.get("typ") != "UNK":
+        dup["hours"] = r["hours"] + (f" · {note}" if note else "")
+        dup["typ"] = r["typ"]; dup["hours_raw"] = r.get("hours_raw", "")
+    else:
+        return                                                  # Google has no hours: the hand-verified text stands
+    for c in ("rating", "phone", "website", "maps_url"):
+        if r.get(c): dup[c] = r[c]
+    dup["source"] = "curated+Google"
+
+
 def merge_sources(*frames):
     """Earlier frames win (pass the hand-verified rows first).  A later row is dropped when a kept row within
-    0.4 mi has a similar name (ratio >= 0.72) or sits within 60 m of it; its links/rating fill any blanks."""
+    0.4 mi has a similar name (ratio >= 0.72) or sits within 60 m of it.  Google listings refresh the hand-verified
+    row they match (hours, type, rating, phone); OpenStreetMap rows only fill blanks."""
     kept, klat, klng, knorm = [], [], [], []
     for df in frames:
         if df is None or df.empty:
@@ -852,15 +926,20 @@ def merge_sources(*frames):
                     if d[k] <= 0.04 or difflib.SequenceMatcher(None, _norm(r["name"]), knorm[k]).ratio() >= 0.72:
                         dup = kept[k]; break
             if dup is not None:
+                if r.get("source") == "Google" and str(dup.get("source", "")).startswith("curated"):
+                    _refresh_from_google(dup, r)
                 for c in ("maps_url", "website", "rating", "phone"):
                     if not dup.get(c) and r.get(c): dup[c] = r[c]
                 continue
+            if r.get("closed"):
+                continue                                        # a closed listing with no hand-verified twin: not a door
             kept.append(dict(r)); klat.append(r["lat"]); klng.append(r["lng"]); knorm.append(_norm(r["name"]))
     cols = ["name", "town", "lat", "lng", "phone", "hours", "hours_raw", "typ", "rating", "website", "maps_url", "source", "er_hint"]
     out = pd.DataFrame(kept)
     for c in cols:
         if c not in out: out[c] = "" if c != "er_hint" else False
     out["er_hint"] = out["er_hint"].fillna(False).astype(bool)
+    out = out.drop(columns=["closed"], errors="ignore")
     return out[cols + [c for c in out.columns if c not in cols]].fillna("")
 
 
@@ -904,26 +983,27 @@ tr:hover td{background:#1a212c;cursor:pointer}
 .src{font-size:11px;color:#9aa3b2}
 a{color:#8fc1ff;text-decoration:none}.note{padding:10px 16px;font-size:12.5px;color:#9aa3b2}
 .pop b{font-size:14px}.pop{font-size:13px;line-height:1.45}
-@media(max-width:700px){td:nth-child(6),th:nth-child(6),td:nth-child(9),th:nth-child(9){display:none}}
+@media(max-width:700px){td:nth-child(7),th:nth-child(7),td:nth-child(10),th:nth-child(10){display:none}}
 </style></head><body>
 <header><h1>__TITLE__</h1><div class="sub">__SUB__</div></header>
 <div class="bar">
  <button class="btn on" data-f="ALL">All</button><button class="btn" data-f="ER">24/7 ER</button>
  <button class="btn" data-f="NIGHT">Night / late</button><button class="btn" data-f="EXT">Extended</button>
- <button class="btn" data-f="DAY">Daytime</button><button class="btn" data-f="UNK">Unknown hrs</button><input id="q" placeholder="search town or clinic...">
+ <button class="btn" data-f="DAY">Daytime</button><button class="btn" data-f="UNK">Unknown hrs</button><input id="q" placeholder="search town or clinic..."><button class="btn" id="near" title="Sort every clinic by distance from where you are right now">&#9673; Near me</button>
 </div>
+<div class="note" id="nearbox" style="display:none"></div>
 <div class="bar legend">
  <span><i class="dot" style="background:#ff5252"></i>24/7 ER</span>
  <span><i class="dot" style="background:#ffab2e"></i>night / late</span>
  <span><i class="dot" style="background:#ffe14d"></i>extended day</span>
  <span><i class="dot" style="background:#4d9bff"></i>daytime GP</span>
  <span><i class="dot" style="background:#9aa3b2"></i>hours unknown - call</span>
- <span><i class="dot" style="background:#0e1116;border:2px solid #fff;width:9px;height:9px"></i>white ring = hand-verified listing</span>
+ <span><i class="dot" style="background:#0e1116;border:2px solid #fff;width:9px;height:9px"></i>white ring = hand-verified listing (refreshed from Google when a key is set)</span>
 </div>
 <div id="map"></div>
 <div class="note">__NOTE_TOP__</div>
 <table id="tbl"><thead><tr>
-<th data-s="mile">__MILE_HDR__</th><th data-s="town">Town</th><th data-s="name">Clinic</th><th data-s="typ">Type</th><th data-s="off">__OFF_HDR__</th><th data-s="hours">Hours</th><th data-s="rating">&#9733;</th><th>Call</th><th data-s="source">Source</th>
+<th data-s="mile">__MILE_HDR__</th><th data-s="here" class="here" style="display:none">From you</th><th data-s="town">Town</th><th data-s="name">Clinic</th><th data-s="typ">Type</th><th data-s="off">__OFF_HDR__</th><th data-s="hours">Hours</th><th data-s="rating">&#9733;</th><th>Call</th><th data-s="source">Source</th>
 </tr></thead><tbody></tbody></table>
 <div class="note">__NOTE_BOTTOM__</div>
 <script>
@@ -945,26 +1025,42 @@ if(HOME){L.marker(HOME.ll).addTo(map).bindPopup('<b>HOME</b><br>'+HOME.label);RI
 const col={ER:'#ff5252',NIGHT:'#ffab2e',EXT:'#ffe14d',DAY:'#4d9bff',UNK:'#9aa3b2'};
 let markers={};
 DATA.forEach((c,i)=>{
- const cur=c.source==='curated';
+ const cur=c.source.indexOf('curated')===0;
  const m=L.circleMarker([c.lat,c.lng],{radius:c.typ==='ER'?9:6,color:cur?'#ffffff':'#0e1116',weight:cur?2:1.5,fillColor:col[c.typ],fillOpacity:.95}).addTo(map);
  const gm=c.maps_url||('https://maps.google.com/?q='+c.lat+','+c.lng);
  m.bindPopup('<div class="pop"><b>'+c.name+'</b><br>'+c.town+' &middot; ~mi '+c.mile+' &middot; '+c.off+' mi off route<br><span class="t-'+c.typ+'">'+c.hours+'</span><br>&#9733; '+(c.rating||'&ndash;')+' &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><a target="_blank" href="'+gm+'">Open in Google Maps</a>'+(c.website?' &middot; <a target="_blank" href="'+c.website+'">website</a>':'')+'<br><span class="src">source: '+c.source+'</span></div>');
  markers[i]=m;
 });
-let F='ALL',Q='',sortK='mile',sortA=true;
+let F='ALL',Q='',sortK='mile',sortA=true,HERE=null,youMarker=null;
+function hav(a,b,c,d){const r=Math.PI/180,R=3958.76;const x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+document.getElementById('near').onclick=()=>{
+ if(!navigator.geolocation){alert('This browser cannot give a location. Open the map in the phone\'s browser or as the home-screen app.');return;}
+ navigator.geolocation.getCurrentPosition(p=>{
+  HERE=[p.coords.latitude,p.coords.longitude];
+  DATA.forEach(c=>{c.here=hav(HERE[0],HERE[1],c.lat,c.lng)});
+  if(youMarker)map.removeLayer(youMarker);
+  youMarker=L.marker(HERE).addTo(map).bindPopup('<b>You are here</b>');
+  map.setView(HERE,10);
+  const ers=DATA.filter(c=>c.typ==='ER'||c.typ==='NIGHT').sort((a,b)=>a.here-b.here).slice(0,3);
+  const nb=document.getElementById('nearbox');nb.style.display='';
+  nb.innerHTML='<b>Nearest overnight doors from where you are:</b> '+(ers.map(c=>c.name+' '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone')+' ('+c.here.toFixed(1)+' mi straight-line, <span class="t-'+c.typ+'">'+c.typ+'</span>)').join(' - ')||'none in this map')+'. Table is now sorted by distance from you.';
+  document.querySelectorAll('.here').forEach(e=>e.style.display='');
+  sortK='here';sortA=true;render();
+ },()=>alert('Location unavailable - allow location access for this page and try again.'),{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+};
 function render(){
  const tb=document.querySelector('#tbl tbody'); tb.innerHTML='';
  let rows=DATA.map((c,i)=>({...c,i})).filter(c=>(F==='ALL'||c.typ===F)&&(!Q||(c.town+' '+c.name).toLowerCase().includes(Q)));
  rows.sort((a,b)=>{let x=a[sortK],y=b[sortK];if(typeof x==='string'){x=x.toLowerCase();y=y.toLowerCase()}return (x<y?-1:x>y?1:0)*(sortA?1:-1)});
  rows.forEach(c=>{
   const tr=document.createElement('tr');
-  tr.innerHTML='<td>'+c.mile+'</td><td>'+c.town+'</td><td>'+c.name+'</td><td class="t-'+c.typ+'">'+c.typ+'</td><td>'+c.off+' mi</td><td>'+c.hours+'</td><td>'+(c.rating||'&ndash;')+'</td><td>'+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'&ndash;')+'</td><td class="src">'+c.source+'</td>';
+  tr.innerHTML='<td>'+c.mile+'</td><td class="here" style="display:'+(HERE?'':'none')+'">'+(c.here!=null?c.here.toFixed(1)+' mi':'')+'</td><td>'+c.town+'</td><td>'+c.name+'</td><td class="t-'+c.typ+'">'+c.typ+'</td><td>'+c.off+' mi</td><td>'+c.hours+'</td><td>'+(c.rating||'&ndash;')+'</td><td>'+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'&ndash;')+'</td><td class="src">'+c.source+'</td>';
   tr.onclick=()=>{map.setView([c.lat,c.lng],12);markers[c.i].openPopup();window.scrollTo({top:0,behavior:'smooth'})};
   tb.appendChild(tr);});
  DATA.forEach((c,i)=>{const s=(F==='ALL'||c.typ===F)&&(!Q||(c.town+' '+c.name).toLowerCase().includes(Q));
   if(s){markers[i].addTo(map)}else{map.removeLayer(markers[i])}});
 }
-document.querySelectorAll('.btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.btn').forEach(x=>x.classList.remove('on'));b.classList.add('on');F=b.dataset.f;render()});
+document.querySelectorAll('.btn[data-f]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.btn[data-f]').forEach(x=>x.classList.remove('on'));b.classList.add('on');F=b.dataset.f;render()});
 document.getElementById('q').oninput=e=>{Q=e.target.value.toLowerCase();render()};
 document.querySelectorAll('th[data-s]').forEach(h=>h.onclick=()=>{const k=h.dataset.s;if(sortK===k)sortA=!sortA;else{sortK=k;sortA=true}render()});
 render();
@@ -1027,23 +1123,38 @@ def _live_label(prov):
     return "Google Places" if prov == "google" else "OpenStreetMap (no ratings; hours where mapped)"
 
 
-def corridor_map(origin, destination, *, via=None, variant_via=None, title=None, provider="auto",
-                 corridor_mi=12, er_reach_mi=45, curated=True, out_html=None):
+def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, google_link=None, track=None,
+                 title=None, provider="auto", corridor_mi=12, er_reach_mi=45, curated=True, out_html=None):
     """Any driving corridor in the US -> the same map/table as Harley's corridor maps, from live data.
+    The road comes from one of: origin/destination (+ via stops) routed by OSRM; google_link, a Google Maps
+    directions link whose stops become the route; or track, the text of a GPX/KML file used exactly as drawn.
     corridor_mi: every clinic this close to the road is kept.  er_reach_mi: 24/7, night and emergency-named
     clinics are kept out to this distance (a metro ER 30 mi off the highway is worth knowing about; a daytime GP is not)."""
     prov = _provider_pick(provider)
-    o, d = geocode(origin), geocode(destination)
-    pts = [o] + [geocode(v) for v in (via or [])] + [d]
-    route = route_osrm(pts)
+    if google_link:
+        stops = waypoints_from_google_link(google_link)
+        origin, destination = stops[0], stops[-1]
+        via = stops[1:-1] + list(via or [])
+    if track:
+        route = route_from_track(track)
+        o, d = (route["lat"][0], route["lng"][0]), (route["lat"][-1], route["lng"][-1])
+        origin = origin or f"{o[0]:.4f},{o[1]:.4f}"; destination = destination or f"{d[0]:.4f},{d[1]:.4f}"
+    else:
+        if not origin or not destination:
+            raise ValueError("Give origin and destination, a google_link, or a track")
+        o, d = geocode(origin), geocode(destination)
+        route = route_osrm([o] + [geocode(v) for v in (via or [])] + [d])
     variant = route_osrm([o] + [geocode(v) for v in variant_via] + [d]) if variant_via else None
     frames, warnings = [], []
     if curated:
         frames.append(load_curated())
     try:
         if prov == "google":
-            live = fetch_google(_centers_along(route, step_mi=18), radius_mi=corridor_mi + 3, er_reach_mi=er_reach_mi)
-        else:
+            try:
+                live = fetch_google(_centers_along(route, step_mi=18), radius_mi=corridor_mi + 3, er_reach_mi=er_reach_mi)
+            except RuntimeError as e:                  # key rejected, quota reached, outage: fall back, do not fail
+                warnings.append(f"Google Places unavailable ({e}); live layer from OpenStreetMap instead"); prov = "osm"
+        if prov == "osm":
             boxes = _bboxes_along(route, chunk_mi=150, margin_mi=er_reach_mi)
             live = fetch_osm(boxes)
             if live.attrs.get("failed"):
@@ -1103,8 +1214,11 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
             if radius_mi > 10:                      # ring of extra centres so the 20-per-call cap does not truncate a metro
                 r_lat = radius_mi * 0.6 / 69.0; r_lng = radius_mi * 0.6 / (69.0 * math.cos(math.radians(lat)))
                 centers += [(lat + r_lat * math.cos(a), lng + r_lng * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 6, endpoint=False)]
-            live = fetch_google(centers, radius_mi=min(radius_mi, 31), er_reach_mi=radius_mi * 2)
-        else:
+            try:
+                live = fetch_google(centers, radius_mi=min(radius_mi, 31), er_reach_mi=radius_mi * 2)
+            except RuntimeError as e:
+                warnings.append(f"Google Places unavailable ({e}); live layer from OpenStreetMap instead"); prov = "osm"
+        if prov == "osm":
             boxes = [_bbox_around(lat, lng, radius_mi * 2)]
             live = fetch_osm(boxes)
             if live.attrs.get("failed"):
@@ -1135,3 +1249,169 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
     if out_html:
         pathlib.Path(out_html).write_text(page, encoding="utf-8")
     return {"df": df, "home": (lat, lng), "html": page, "provider": prov, "warnings": warnings}
+
+# vetlocator | 9 pwa
+LEAFLET_CDN = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/"
+LEAFLET_FILES = ["leaflet.min.css", "leaflet.min.js", "images/marker-icon.png", "images/marker-icon-2x.png",
+                 "images/marker-shadow.png", "images/layers.png", "images/layers-2x.png"]
+
+
+def _fetch_bytes(url):
+    p = CACHE_DIR / ("asset_" + hashlib.md5(url.encode()).hexdigest()[:12])
+    if p.exists():
+        return p.read_bytes()
+    r = requests.get(url, headers={"User-Agent": UA}, timeout=60); r.raise_for_status()
+    p.write_bytes(r.content)
+    return r.content
+
+
+def _icon_png(size):
+    """A paw print on a red tile - the home-screen icon."""
+    import io
+    from PIL import Image, ImageDraw
+    im = Image.new("RGBA", (size, size), "#151a22"); d = ImageDraw.Draw(im)
+    pad = size * 0.10
+    d.rounded_rectangle([pad, pad, size - pad, size - pad], radius=size * 0.2, fill="#ff5252")
+    cx, cy = size / 2, size * 0.60
+    d.ellipse([cx - size * 0.17, cy - size * 0.13, cx + size * 0.17, cy + size * 0.15], fill="white")
+    for (dx, dy, r) in [(-0.24, -0.20, 0.075), (-0.09, -0.30, 0.08), (0.09, -0.30, 0.08), (0.24, -0.20, 0.075)]:
+        d.ellipse([cx + dx * size - r * size, cy + dy * size - r * size, cx + dx * size + r * size, cy + dy * size + r * size], fill="white")
+    buf = io.BytesIO(); im.save(buf, "PNG"); return buf.getvalue()
+
+
+_PWA_HEAD = r"""<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="./manifest.webmanifest"><meta name="theme-color" content="#151a22">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="__SHORT__">
+<link rel="apple-touch-icon" href="./icon-192.png"><link rel="icon" href="./icon-192.png">
+<style>
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#0e1116;color:#e8eaee;padding-top:env(safe-area-inset-top)}
+header{padding:14px 16px 10px;background:#151a22;border-bottom:2px solid #2a3140;display:flex;align-items:center;gap:10px}
+header img{width:34px;height:34px;border-radius:8px}
+h1{margin:0;font-size:20px;color:#ffd94d}.sub{color:#9aa3b2;font-size:12.5px;margin-top:2px}
+main{padding:12px 16px 24px;max-width:720px}
+.btn{display:block;text-align:center;background:#ff5252;color:#fff;font-weight:700;font-size:17px;border-radius:14px;padding:16px;margin:10px 0;text-decoration:none;border:0;width:100%;box-sizing:border-box;cursor:pointer}
+.btn.blue{background:#2f6fd6}.btn.grey{background:#1d2430;border:1px solid #3a4356;color:#e8eaee;font-weight:600}
+h2{font-size:14px;color:#9aa3b2;font-weight:600;margin:18px 0 6px;text-transform:none}
+a.card{display:block;background:#1a212c;border:1px solid #2a3140;border-radius:12px;padding:12px 14px;margin:8px 0;color:#e8eaee;text-decoration:none}
+a.card b{display:block;font-size:15px;color:#fff}a.card span{color:#9aa3b2;font-size:12.5px}
+#near{display:none;background:#1a212c;border:1px solid #ffab2e;border-radius:12px;padding:12px 14px;margin:8px 0;font-size:14px;line-height:1.5}
+#near a{color:#8fc1ff;text-decoration:none;font-weight:700}
+.t-ER{color:#ff6b6b;font-weight:700}.t-NIGHT{color:#ffb84d;font-weight:700}
+.status{font-size:12.5px;color:#9aa3b2;padding:10px 0 0;line-height:1.5}.status b{color:#7fe0a0}.status i{color:#ffb84d;font-style:normal}
+.off{display:none;background:#3a2a1a;border:1px solid #ffab2e;color:#ffd9a0;border-radius:10px;padding:10px 12px;font-size:13px;margin:8px 0}
+body.offline .off{display:block}body.offline .btn.blue{opacity:.45;pointer-events:none}
+</style>"""
+
+_PWA_INDEX = r"""<!DOCTYPE html><html><head><title>__TITLE__</title>__HEAD__</head><body>
+<header><img src="./icon-192.png" alt=""><div><h1>__TITLE__</h1><div class="sub">__SUB__</div></div></header>
+<main>
+<div class="off">No signal - the live builder needs internet. Saved maps and Near me still work.</div>
+<button class="btn" id="nearbtn">&#9673; Nearest overnight doors to me now</button>
+<div id="near"></div>
+__LIVE__
+<h2>Saved maps - work without signal</h2>
+__CARDS__
+<div class="status" id="st">To keep this on your phone: Safari share button &rarr; <b>Add to Home Screen</b>; Chrome &#8942; &rarr; <b>Add to Home screen</b>. The saved maps are stored on the phone after the first open. Map tiles only where you have viewed them online; the clinic tables, tap-to-call and Near me never need signal.</div>
+</main>
+<script>
+const MAPS=__MAPFILES__;
+function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}
+window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').then(()=>{document.getElementById('st').insertAdjacentHTML('afterbegin','<b>Saved on this phone.</b> ')}).catch(()=>{});}
+function hav(a,b,c,d){const r=Math.PI/180,R=3958.76;const x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+async function allClinics(){const seen={},out=[];
+ for(const f of MAPS){try{const t=await (await fetch('./'+f)).text();const m=t.match(/const DATA=(\[[\s\S]*?\]); const MAIN=/);if(!m)continue;
+  for(const c of JSON.parse(m[1])){const k=c.name+'|'+c.lat.toFixed(3);if(!seen[k]){seen[k]=1;out.push(c);}}}catch(e){}}
+ return out;}
+document.getElementById('nearbtn').onclick=()=>{
+ const box=document.getElementById('near');box.style.display='block';box.innerHTML='Getting your location...';
+ if(!navigator.geolocation){box.innerHTML='This browser cannot give a location.';return;}
+ navigator.geolocation.getCurrentPosition(async p=>{
+  const la=p.coords.latitude,lo=p.coords.longitude;const all=await allClinics();
+  all.forEach(c=>c.d=hav(la,lo,c.lat,c.lng));
+  const over=all.filter(c=>c.typ==='ER'||c.typ==='NIGHT').sort((a,b)=>a.d-b.d).slice(0,4);
+  const any=all.filter(c=>c.typ!=='ER'&&c.typ!=='NIGHT').sort((a,b)=>a.d-b.d).slice(0,3);
+  const row=c=>'<div><b>'+c.name+'</b> <span class="t-'+c.typ+'">'+c.typ+'</span> &middot; '+c.d.toFixed(1)+' mi straight-line &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><span style="color:#9aa3b2;font-size:12.5px">'+c.town+' &middot; '+c.hours+'</span></div>';
+  box.innerHTML=(over.length?'<div style="color:#ffd94d;font-weight:700;margin-bottom:4px">Overnight doors nearest you</div>'+over.map(row).join('<hr style="border:0;border-top:1px solid #2a3140;margin:6px 0">'):'<div>No 24/7 or night clinic in the saved maps near here.</div>')
+   +(any.length?'<div style="color:#ffd94d;font-weight:700;margin:10px 0 4px">Nearest daytime clinics</div>'+any.map(row).join('<hr style="border:0;border-top:1px solid #2a3140;margin:6px 0">'):'')
+   +'<div style="color:#9aa3b2;font-size:12px;margin-top:8px">From the '+all.length+' clinics in your saved maps. Call before driving - hours change.</div>';
+ },()=>{box.innerHTML='Location unavailable - allow location access for this app and try again.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+};
+</script></body></html>"""
+
+_PWA_LIVE = r"""<!DOCTYPE html><html><head><title>__TITLE__ - live builder</title>__HEAD__
+<style>html,body{height:100%}body{display:flex;flex-direction:column}header{flex:0 0 auto}iframe{flex:1 1 auto;border:0;width:100%}
+.bar{padding:8px 16px;background:#151a22;border-bottom:1px solid #2a3140;font-size:13px}.bar a{color:#8fc1ff;text-decoration:none}</style></head>
+<body><div class="bar"><a href="./index.html">&larr; Saved maps &amp; Near me</a> &nbsp;&middot;&nbsp; <a href="__APP__" target="_blank">open in browser</a></div>
+<div class="off" style="margin:8px 16px">No signal - the live builder needs internet. <a href="./index.html" style="color:#ffd94d">Use the saved maps</a>.</div>
+<iframe src="__APP__?embed=true" allow="geolocation; clipboard-write" title="Vet locator"></iframe>
+<script>function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();</script>
+</body></html>"""
+
+_PWA_SW = r"""const VERSION='__VERSION__';const PRECACHE=__PRECACHE__;
+self.addEventListener('install',e=>{e.waitUntil(caches.open('vet-'+VERSION).then(c=>c.addAll(PRECACHE)).then(()=>self.skipWaiting()))});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!=='vet-'+VERSION&&k!=='tiles').map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
+async function trim(c){const keys=await c.keys();if(keys.length>2500){for(const k of keys.slice(0,300))await c.delete(k);}}
+self.addEventListener('fetch',e=>{
+ const u=new URL(e.request.url);
+ if(/arcgisonline|nationalmap\.gov/.test(u.host)){
+  e.respondWith(caches.open('tiles').then(async c=>{const hit=await c.match(e.request);if(hit)return hit;
+   try{const r=await fetch(e.request);c.put(e.request,r.clone());trim(c);return r;}catch(err){return new Response('',{status:504});}}));
+  return;}
+ if(u.origin===self.location.origin){
+  e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(hit=>hit||fetch(e.request).then(r=>{if(r.ok){const cp=r.clone();caches.open('vet-'+VERSION).then(c=>c.put(e.request,cp));}return r;})));
+ }
+});"""
+
+
+def build_pwa(map_files, out_dir="pwa", title="Vet maps", subtitle="", app_url="", short_name="Vet maps"):
+    """Packages finished map pages as an installable phone app folder: the maps (Leaflet served locally instead of
+    from a CDN), a home page with a 'nearest overnight doors to me' button that searches every saved map, a page
+    that embeds the live Streamlit builder (app_url) when there is signal, a manifest, icons and a service worker
+    that stores everything on the phone at first open.  Host the folder on any static site (GitHub Pages is free)."""
+    out = pathlib.Path(out_dir); (out / "leaflet" / "images").mkdir(parents=True, exist_ok=True)
+    for f in LEAFLET_FILES:
+        (out / "leaflet" / f.replace(".min", "")).write_bytes(_fetch_bytes(LEAFLET_CDN + f))
+    head = _PWA_HEAD.replace("__SHORT__", _esc(short_name))
+    cards, names, digest = [], [], hashlib.md5()
+    pre = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"] + \
+          ["./leaflet/" + f.replace(".min", "") for f in LEAFLET_FILES]
+    for mf in map_files:
+        src = pathlib.Path(mf); page = src.read_text(encoding="utf-8")
+        page = (page.replace(LEAFLET_CDN + "leaflet.min.css", "./leaflet/leaflet.css")
+                    .replace(LEAFLET_CDN + "leaflet.min.js", "./leaflet/leaflet.js")
+                    .replace("<header>", '<header><a href="./index.html" style="color:#8fc1ff;font-size:13px;text-decoration:none">&larr; all maps</a>', 1))
+        (out / src.name).write_text(page, encoding="utf-8"); digest.update(page.encode())
+        t = re.search(r"<title>(.*?)</title>", page); s = re.search(r'<div class="sub">(.*?)</div>', page)
+        cards.append(f'<a class="card" href="./{src.name}"><b>{t.group(1) if t else src.name}</b><span>{s.group(1) if s else ""}</span></a>')
+        pre.append("./" + src.name); names.append(src.name)
+    live = ""
+    if app_url:
+        (out / "live.html").write_text(_PWA_LIVE.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__APP__", _esc(app_url.rstrip("/"))), encoding="utf-8")
+        pre.append("./live.html")
+        live = '<a class="btn blue" href="./live.html">Plan a trip or home map (live, needs signal)</a>'
+    (out / "index.html").write_text(_PWA_INDEX.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__SUB__", subtitle)
+                                    .replace("__CARDS__", "\n".join(cards)).replace("__LIVE__", live)
+                                    .replace("__MAPFILES__", json.dumps(names)), encoding="utf-8")
+    (out / "manifest.webmanifest").write_text(json.dumps({
+        "name": title, "short_name": short_name, "start_url": "./index.html", "scope": "./", "display": "standalone",
+        "background_color": "#0e1116", "theme_color": "#151a22",
+        "icons": [{"src": "./icon-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]}, indent=1), encoding="utf-8")
+    (out / "icon-192.png").write_bytes(_icon_png(192)); (out / "icon-512.png").write_bytes(_icon_png(512))
+    digest.update(app_url.encode())
+    (out / "sw.js").write_text(_PWA_SW.replace("__VERSION__", digest.hexdigest()[:10]).replace("__PRECACHE__", json.dumps(pre)), encoding="utf-8")
+    (out / "README.md").write_text(
+        f"# {title} - phone app\n\nA static web app: host this folder and open it on a phone.\n\n"
+        "## Put it online with GitHub Pages (free)\n\n"
+        "1. Create a **public** repository on GitHub (Pages is free only for public repos) and upload everything in this folder, "
+        "including the `leaflet` sub-folder, with **Add file -> Upload files**.\n"
+        "2. Repository **Settings -> Pages -> Build and deployment -> Source: Deploy from a branch**, branch `main`, folder `/ (root)`, **Save**.\n"
+        "3. After a minute the same page shows the address, e.g. `https://<user>.github.io/<repo>/`. Open it on the phone.\n"
+        "4. Add it to the home screen (Safari: share -> Add to Home Screen; Chrome: menu -> Add to Home screen). "
+        "From then on it opens like an app; the saved maps and Near me work without signal, the live builder when there is one.\n\n"
+        "To update: rebuild in the notebook, upload the new files over the old ones. Phones pick up the new version on their next online open.\n\n"
+        "App-store version: https://www.pwabuilder.com packages a hosted app like this one into Android and iOS store submissions.\n",
+        encoding="utf-8")
+    return sorted(str(p.relative_to(out)) for p in out.rglob("*") if p.is_file())
