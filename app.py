@@ -1,4 +1,4 @@
-"""Vet locator - shareable web app (phone-first layout).
+"""VetAlong - shareable map builder (phone-first layout).
 
 Run locally:   pip install -r requirements.txt && streamlit run app.py
 Share online:  push this folder to GitHub and deploy on https://share.streamlit.io (free) - see README.md
@@ -18,20 +18,20 @@ def _secret(name, default=""):
 # A Google Places key (optional) gives ratings, phones and hours for every clinic; without it the app uses OpenStreetMap.
 if _secret("GOOGLE_MAPS_API_KEY"):
     os.environ["GOOGLE_MAPS_API_KEY"] = _secret("GOOGLE_MAPS_API_KEY")
-os.environ.setdefault("VET_LOCATOR_CONTACT", _secret("VET_LOCATOR_CONTACT", "vet-locator streamlit app"))
+os.environ.setdefault("VET_LOCATOR_CONTACT", _secret("VET_LOCATOR_CONTACT", "VetAlong streamlit app"))
 
 import vetlocator as vl   # noqa: E402  (reads the environment at import time)
 
 APP_DIR = pathlib.Path(__file__).resolve().parent
 STATIC_MAPS = APP_DIR / "static" / "maps"          # served at app/static/maps/... when enableStaticServing is on (.streamlit/config.toml)
 
-st.set_page_config(page_title="Vet locator", page_icon=":dog:", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="VetAlong", page_icon=":dog:", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""<style>
 .block-container{padding-top:1.2rem;padding-bottom:2rem}
 h1{font-size:1.5rem !important;margin-bottom:0.2rem}
 div[data-testid="stMetric"]{background:#1a212c;border-radius:10px;padding:8px 12px}
 </style>""", unsafe_allow_html=True)
-st.title("Vet locator")
+st.title("VetAlong")
 st.caption("Every vet door along a drive or around an address: 24/7 ERs, night clinics, extended-hours and daytime GPs, "
            "with phone, hours and rating. Hand-verified listings (Denver metro, Denver-Flint, Denver-League City) always included.")
 
@@ -134,7 +134,7 @@ if go:
     _show_page(res["html"])
 
     d1, d2 = st.columns(2)
-    d1.download_button("Save the map (HTML - add it to the phone app under My maps)", res["html"], file_name=fname + ".html", mime="text/html", use_container_width=True)
+    d1.download_button("Save the map (HTML - add it to the VetAlong phone app under My maps)", res["html"], file_name=fname + ".html", mime="text/html", use_container_width=True)
     d2.download_button("Save the table (CSV)", df.drop(columns=["er_hint"], errors="ignore").to_csv(index=False),
                        file_name=fname + ".csv", mime="text/csv", use_container_width=True)
 

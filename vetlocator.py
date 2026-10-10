@@ -45,6 +45,7 @@ def _get_json(url, *, params=None, data=None, headers=None, method="GET", timeou
         time.sleep(backoff * (i + 1))
     raise RuntimeError(f"{url.split('/')[2]}: {last}")
 
+
 # vetlocator | 2 geometry
 def haversine_mi(lat1, lon1, lat2, lon2):
     """Great-circle miles; works on scalars or numpy arrays (broadcasting)."""
@@ -203,6 +204,7 @@ def route_from_track(xml_text):
     lat = np.array([q[0] for q in pts]); lng = np.array([q[1] for q in pts])
     seg = haversine_mi(lat[:-1], lng[:-1], lat[1:], lng[1:]); cum = np.concatenate([[0.0], np.cumsum(seg)])
     return {"lat": lat, "lng": lng, "cum_mi": cum, "total_mi": float(cum[-1]), "drive_h": float(cum[-1]) / 55.0}
+
 
 # vetlocator | 3 hours
 # One schedule format for every source: {day 0..6 (Mon..Sun): [(open_min, close_min, is_24h), ...]}
@@ -437,6 +439,7 @@ def classify_row(hours_text, sched, name):
     if typ == "UNK" and name and NAME_ER_RE.search(name):
         return "UNK", shown + " - name suggests emergency/urgent: CALL to confirm"
     return typ, shown
+
 
 # vetlocator | 4 curated
 # The 231 clinics hand-verified against Google listings (Sept 2026) for Harley's three maps:
@@ -684,6 +687,7 @@ def load_curated():
     df["er_hint"] = df["typ"].isin(["ER", "NIGHT"])
     return df
 
+
 # vetlocator | 5 providers
 def _fmt_phone(s):
     d = re.sub(r"\D", "", str(s or ""))
@@ -870,6 +874,7 @@ def _centers_along(route, step_mi):
     target = target[target <= route["total_mi"]]
     return list(zip(np.interp(target, route["cum_mi"], route["lat"]), np.interp(target, route["cum_mi"], route["lng"])))
 
+
 # vetlocator | 6 merge
 def _norm(s):
     s = re.sub(r"[^a-z0-9 ]", " ", str(s).lower())
@@ -958,6 +963,7 @@ def anchor_chain(df, reach_mi=12):
     """24/7 and night clinics close to the road, in mile order - the numbers to save before leaving."""
     a = df[df["typ"].isin(["ER", "NIGHT"]) & (df["off"] <= reach_mi)].sort_values(["mile", "typ"])
     return a[["mile", "town", "name", "typ", "off", "hours", "phone"]].reset_index(drop=True)
+
 
 # vetlocator | 7 render
 _TEMPLATE = r"""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1105,6 +1111,7 @@ def render_html(df, *, title, sub, note_top, note_bottom, route=None, variant=No
            .replace("__OFF_HDR__", "Distance" if mode == "home" else "Off-route"))
     return out
 
+
 # vetlocator | 8 build
 def _provider_pick(provider):
     if provider == "auto":
@@ -1251,6 +1258,7 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
         pathlib.Path(out_html).write_text(page, encoding="utf-8")
     return {"df": df, "home": (lat, lng), "html": page, "provider": prov, "warnings": warnings}
 
+
 # vetlocator | 9 pwa
 LEAFLET_CDN = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/"
 
@@ -1342,13 +1350,21 @@ __LIVE__
 <div class="empty" id="mmhelp">Build a map in the live builder, tap <b>Save the map</b> there, then add the saved file here. It stays on this phone; nobody else can see it.</div>
 <label class="btn grey" for="addmap">+ Add a saved map file</label><input id="addmap" type="file" accept=".html,text/html" style="display:none">
 __BUILTIN__
-<div class="status" id="st">To keep this on your phone: Safari share button &rarr; <b>Add to Home Screen</b>; Chrome &#8942; &rarr; <b>Add to Home screen</b>. Map tiles need internet the first time; clinic tables, tap-to-call and Near me never do. <a href="./privacy.html">Privacy</a></div>
+<div id="sponsor"></div>
+<button class="btn grey" id="installbtn" style="display:none">&#11015; Install this app on your phone</button>
+<div class="status" id="st"><a href="./install.html" id="howto"><b style="color:#8fc1ff">Put it on your home screen</b></a> so it opens like an app and works without signal. Map tiles need internet the first time; clinic tables, tap-to-call and Near me never do. <a href="./privacy.html">Privacy</a></div>
 </main>
 <script>
 __LOCALIZE__
 function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}
 window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').then(()=>{document.getElementById('st').insertAdjacentHTML('afterbegin','<b>Saved on this phone.</b> ')}).catch(()=>{});}
+let deferredInstall=null;const ib=document.getElementById('installbtn');
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;ib.style.display='';});
+ib.onclick=async()=>{if(!deferredInstall)return;ib.disabled=true;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;ib.style.display='none';};
+window.addEventListener('appinstalled',()=>{ib.style.display='none';});
+if(window.matchMedia('(display-mode: standalone)').matches||navigator.standalone){document.getElementById('st').insertAdjacentHTML('afterbegin','<b>Installed.</b> ');document.getElementById('howto').style.display='none';}
+fetch('./sponsor.json',{cache:'no-store'}).then(r=>r.json()).then(sp=>{if(sp&&sp.enabled&&sp.url){document.getElementById('sponsor').innerHTML='<a class="card" href="'+sp.url+'" target="_blank" rel="noopener sponsored" style="border-color:#3a4356"><b>'+sp.title+'</b><span>'+(sp.text||'')+'</span><span style="display:block;font-size:11px;margin-top:4px;color:#6f7886">Sponsored</span></a>';}}).catch(()=>{});
 function hav(a,b,c,d){const r=Math.PI/180,R=3958.76;const x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
 const idx=()=>{try{return JSON.parse(localStorage.getItem('mymaps')||'[]')}catch(e){return []}};
 const saveIdx=l=>localStorage.setItem('mymaps',JSON.stringify(l));
@@ -1356,7 +1372,7 @@ function renderMine(){const l=idx(),box=document.getElementById('mymaps');box.in
  document.getElementById('mmhelp').style.display=l.length?'none':'';
  box.querySelectorAll('.rm').forEach(b=>b.onclick=async e=>{e.preventDefault();const id=b.dataset.id;const c=await caches.open('mymaps');await c.delete('./map-'+id+'.html');saveIdx(idx().filter(m=>m.id!==id));renderMine();});}
 document.getElementById('addmap').onchange=async e=>{const f=e.target.files[0];if(!f)return;let t=await f.text();
- if(t.indexOf('const DATA=')<0){alert('That is not a map saved from the vet locator builder.');return;}
+ if(t.indexOf('const DATA=')<0){alert('That is not a map saved from the map builder.');return;}
  t=localizeMap(t);const id=(Date.now().toString(36)+Math.random().toString(36).slice(2,7));
  const c=await caches.open('mymaps');await c.put(new Request('./map-'+id+'.html'),new Response(t,{headers:{'Content-Type':'text/html; charset=utf-8'}}));
  const ti=(t.match(/<title>(.*?)<\/title>/)||[])[1]||f.name,su=(t.match(/<div class="sub">(.*?)<\/div>/)||[])[1]||'';
@@ -1388,7 +1404,7 @@ _PWA_LIVE = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - live bui
 .bar{padding:8px 16px;background:#151a22;border-bottom:1px solid #2a3140;font-size:13px}.bar a{color:#8fc1ff;text-decoration:none}</style></head>
 <body><div class="bar"><a href="./index.html">&larr; My maps &amp; Near me</a> &nbsp;&middot;&nbsp; <a href="__APP__" target="_blank">open in browser</a></div>
 <div class="off" style="margin:8px 16px">No signal - the live builder needs internet. <a href="./index.html" style="color:#ffd94d">Use your saved maps</a>.</div>
-<iframe src="__APP__?embed=true" allow="geolocation; clipboard-write" title="Vet locator builder"></iframe>
+<iframe src="__APP__?embed=true" allow="geolocation; clipboard-write" title="Map builder"></iframe>
 <script>function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();</script>
 </body></html>"""
 
@@ -1407,6 +1423,127 @@ _PWA_PRIVACY = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - priva
 <p>Contact: __CONTACT__</p>
 </main></body></html>"""
 
+_PWA_INSTALL = r"""<!DOCTYPE html><html lang="en"><head><title>Get __TITLE__ on your phone</title>__HEAD__
+<meta property="og:type" content="website"><meta property="og:title" content="__TITLE__ - get it on your phone"><meta property="og:description" content="__DESC__"><meta property="og:image" content="__SITE__icon-512.png">
+<style>
+main{max-width:560px;margin:0 auto}
+.hero{background:#1a212c;border:1px solid #2a3140;border-radius:16px;padding:18px 16px 14px;margin:4px 0 14px}
+.hero h2{font-size:25px;line-height:1.15;color:#fff;font-weight:700;margin:0 0 12px}.hero h2 em{font-style:normal;color:#8fc1ff;display:block;font-size:19px;margin-top:2px}
+.hero p{font-size:15px;line-height:1.55;color:#c9ceda;margin:0 0 10px}.hero p u{text-decoration-thickness:2px;text-underline-offset:3px;color:#fff}
+.warn{background:#3a2a1a;border:1px solid #ffab2e;color:#ffd9a0;border-radius:12px;padding:12px;font-size:14px;line-height:1.5;margin:12px 0 4px}.warn .btn{margin:10px 0 8px}.warn b{color:#fff}
+.ok{background:#1b3324;border:1px solid #3fbf74;color:#b9f0cf;border-radius:12px;padding:12px;font-size:14px;line-height:1.5;margin:12px 0 4px}
+.desk{background:#1a212c;border:1px solid #2a3140;border-radius:16px;padding:16px;margin:0 0 14px;text-align:center;font-size:15px;line-height:1.5}
+.desk .qr{display:block;width:fit-content;background:#fff;padding:8px;border-radius:12px;margin:10px auto}.desk .qr svg{display:block;width:180px;height:180px}.desk code{display:block;color:#ffd94d;font-size:14px;word-break:break-all;margin-top:4px}
+.tabs{display:flex;gap:6px;margin:14px 0 6px}.tabs button{flex:1;background:#1a212c;border:1px solid #3a4356;color:#c9ceda;border-radius:10px;padding:10px 4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.tabs button.on{background:#2f6fd6;border-color:#2f6fd6;color:#fff}
+section{display:none}section.on{display:block}
+.step{display:flex;gap:12px;margin:16px 0 4px;align-items:flex-start}.step .n{flex:0 0 30px;height:30px;border-radius:50%;background:#ffd94d;color:#151a22;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.step div{flex:1;min-width:0}.step p{margin:4px 0 6px;font-size:15px;line-height:1.5}.step p b{color:#fff}.step small{display:block;color:#9aa3b2;font-size:12.5px;line-height:1.45;margin-top:-2px}
+.phone{background:#0b0e13;border:2px solid #3a4356;border-radius:22px;padding:10px 8px 8px;width:min(100%,290px);margin:8px 0 2px;font-size:12px;color:#c9ceda;box-sizing:border-box}
+.phone .bar{display:flex;align-items:center;gap:8px;padding:4px 6px;color:#9aa3b2}.phone .bar.bottom{justify-content:space-around;font-size:19px;padding-top:8px}
+.phone .url{flex:1;background:#1d2430;border-radius:9px;padding:6px 9px;color:#c9ceda;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+.phone .ic{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:17px;color:#c9ceda;border-radius:6px;flex:0 0 auto;font-weight:700}
+.phone .ic.hl{outline:2px solid #ff5252;outline-offset:3px;color:#ff5252}
+.phone .app{background:#0e1116;border-radius:10px;margin:6px 0;overflow:hidden}
+.phone .ah{display:flex;align-items:center;gap:8px;padding:9px 10px;background:#151a22;border-bottom:2px solid #2a3140}.phone .ah img{width:22px;height:22px;border-radius:6px}.phone .ah b{color:#ffd94d;font-size:13px}
+.phone .ab{margin:8px 10px;background:#ff5252;color:#fff;border-radius:9px;padding:9px;text-align:center;font-weight:700;font-size:11px}
+.phone .al{height:9px;background:#1d2430;border-radius:5px;margin:7px 10px}
+.phone .menu{background:#1a212c;border-radius:12px;overflow:hidden;margin:4px 0}
+.phone .menu div{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #232a36;font-size:12.5px;color:#dfe3ea}.phone .menu div:last-child{border-bottom:0}
+.phone .menu div span{width:18px;text-align:center;color:#9aa3b2;flex:0 0 auto}
+.phone .menu div.hl{outline:2px solid #ff5252;outline-offset:-2px;border-radius:8px;background:#2b1e1e;color:#fff;font-weight:700}.phone .menu div.hl span{color:#ff5252}
+.phone .dlg{background:#1a212c;border-radius:14px;padding:12px;margin:8px 0 4px}.phone .dlg .row{display:flex;align-items:center;gap:10px}.phone .dlg img{width:40px;height:40px;border-radius:10px}
+.phone .dlg b{display:block;color:#fff;font-size:14px}.phone .dlg small{color:#9aa3b2;font-size:11.5px}
+.phone .dlg .acts{display:flex;justify-content:flex-end;gap:14px;margin-top:12px;font-weight:700;color:#8fc1ff}.phone .dlg .go{background:#2f6fd6;color:#fff;border-radius:9px;padding:7px 16px;outline:2px solid #ff5252;outline-offset:3px}
+.tip{color:#ff5252;font-weight:700;font-size:12px;text-align:center;margin-top:8px}
+.after{background:#1a212c;border:1px solid #2a3140;border-radius:16px;padding:6px 16px 10px;margin:18px 0 10px}
+.help{color:#9aa3b2;font-size:13.5px;line-height:1.5;margin:14px 0}.help a{color:#8fc1ff;text-decoration:none}
+</style></head><body>
+<header><img src="./icon-192.png" alt=""><div><h1>Get __TITLE__ on your phone</h1><div class="sub">Free &middot; about 30 seconds &middot; no app store needed</div></div></header>
+<main>
+<div class="hero">
+<h2>Not your regular mobile app <em>(good to know)</em></h2>
+<p><b>__TITLE__</b> is a web app. Instead of downloading it from a store, you <u>save it to your home screen from Safari or Chrome</u>.</p>
+<p>It takes a fraction of the space of a normal app, updates itself, and once it is on your home screen, <b>Nearest overnight doors</b>, your saved maps and tap-to-call all work with no signal at all.</p>
+<div class="warn" id="inapp" hidden></div>
+<button class="btn" id="installbtn" hidden>&#11015; Install __TITLE__ now (one tap)</button>
+<div class="ok" id="done" hidden><b>Installed.</b> Close this and open <b>__TITLE__</b> from your home screen. The first time, tap <b>Nearest overnight doors to me now</b> and allow location.</div>
+</div>
+<div class="desk" id="desk" hidden>Open this page on your phone:<br><code id="here"></code>__QR__<br><span style="color:#9aa3b2;font-size:13px">Scan with the phone's camera, or text yourself the link.</span></div>
+<div class="tabs"><button data-p="ios">iPhone / iPad</button><button data-p="android">Android (Chrome)</button><button data-p="samsung">Samsung Internet</button></div>
+
+<section id="p-ios">
+<div class="step"><div class="n">1</div><div><p>Open this page in <b>Safari</b> and tap the <b>share button</b> at the bottom of the screen.</p>
+<small>From Instagram, Facebook or Messages, the page may open inside that app: tap &bull;&bull;&bull; in the corner and choose <b>Open in Safari</b> first.</small>
+<div class="phone"><div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Nearest overnight doors to me now</div><div class="al"></div><div class="al" style="width:55%"></div></div>
+<div class="bar"><span class="ic" style="font-size:12px">AA</span><div class="url">&#128274; __HOST__</div><span class="ic">&#8635;</span></div>
+<div class="bar bottom"><span class="ic">&lsaquo;</span><span class="ic">&rsaquo;</span><span class="ic hl"><svg width="18" height="21" viewBox="0 0 18 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 13V1.5M5 5l4-4 4 4M5 8.5H3v11h12v-11h-2"/></svg></span><span class="ic">&#9783;</span><span class="ic">&#10697;</span></div>
+<div class="tip">&uarr; the square with the arrow</div></div></div></div>
+<div class="step"><div class="n">2</div><div><p>Scroll down the list and tap <b>Add to Home Screen</b>.</p>
+<div class="phone"><div class="menu"><div><span>&#10697;</span>Copy</div><div><span>&#8734;</span>Add to Reading List</div><div><span>&#9783;</span>Add Bookmark</div><div><span>&#9734;</span>Add to Favorites</div><div><span>&#9906;</span>Find on Page</div><div class="hl"><span>&#8853;</span>Add to Home Screen</div><div><span>&#9998;</span>Markup</div><div><span>&#9113;</span>Print</div></div></div></div></div>
+<div class="step"><div class="n">3</div><div><p>Tap <b>Add</b> in the top corner.</p>
+<div class="phone"><div class="dlg"><div class="acts" style="justify-content:space-between;margin:0 0 10px"><span style="color:#8fc1ff;font-weight:400">Cancel</span><span style="color:#fff">Add to Home Screen</span><span class="go" style="padding:5px 12px">Add</span></div><div class="row"><img src="./icon-192.png" alt=""><div><b>__TITLE__</b><small>__HOST__</small></div></div></div></div></div></div>
+</section>
+
+<section id="p-android">
+<div class="step"><div class="n">1</div><div><p>Open this page in <b>Chrome</b> and tap the <b>three dots</b> in the top corner.</p>
+<small>From Instagram, Facebook or Messenger, the page opens inside that app and the option is missing: tap &#8942; and choose <b>Open in Chrome</b> (or Open in browser) first.</small>
+<div class="phone"><div class="bar"><span class="ic">&#8962;</span><div class="url">&#128274; __HOST__</div><span class="ic">+</span><span class="ic" style="font-size:11px;border:1.5px solid #c9ceda;width:16px;height:16px;border-radius:4px">3</span><span class="ic hl">&#8942;</span></div>
+<div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Nearest overnight doors to me now</div><div class="al"></div><div class="al" style="width:55%"></div></div>
+<div class="tip">&uarr; the three dots, top right</div></div></div></div>
+<div class="step"><div class="n">2</div><div><p>Tap <b>Add to Home screen</b> (on some phones it says <b>Install app</b>).</p>
+<div class="phone"><div class="menu"><div><span>&#8862;</span>New tab</div><div><span>&#9673;</span>New Incognito tab</div><div><span>&#9719;</span>History</div><div><span>&#10697;</span>Recent tabs</div><div><span>&#8615;</span>Downloads</div><div><span>&#9734;</span>Bookmarks</div><div><span>&#8679;</span>Share...</div><div><span>&#9906;</span>Find in page</div><div class="hl"><span>&#8853;</span>Add to Home screen</div><div><span>&#9645;</span>Desktop site</div><div><span>&#9881;</span>Settings</div></div></div></div></div>
+<div class="step"><div class="n">3</div><div><p>Tap <b>Install</b>.</p><small>If the box says <b>Add</b> instead, tap Add - that works too.</small>
+<div class="phone"><div class="dlg"><div class="row"><img src="./icon-192.png" alt=""><div><b>__TITLE__</b><small>__HOST__</small></div></div><div class="acts"><span>Cancel</span><span class="go">Install</span></div></div></div></div></div>
+</section>
+
+<section id="p-samsung">
+<div class="step"><div class="n">1</div><div><p>Open this page in <b>Samsung Internet</b> and tap the <b>menu</b> (three lines, bottom right).</p>
+<small>If a small download-style icon appears at the right end of the address bar, that is an <b>Install</b> shortcut - tapping it does the whole thing.</small>
+<div class="phone"><div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Nearest overnight doors to me now</div><div class="al"></div><div class="al" style="width:55%"></div></div>
+<div class="bar"><div class="url">&#128274; __HOST__</div><span class="ic">&#8635;</span></div>
+<div class="bar bottom"><span class="ic">&lsaquo;</span><span class="ic">&rsaquo;</span><span class="ic">&#8962;</span><span class="ic">&#9783;</span><span class="ic" style="font-size:11px;border:1.5px solid #c9ceda;width:16px;height:16px;border-radius:4px">3</span><span class="ic hl">&#8801;</span></div>
+<div class="tip">&uarr; the three lines, bottom right</div></div></div></div>
+<div class="step"><div class="n">2</div><div><p>Tap <b>Add page to</b>, then <b>Home screen</b>.</p>
+<div class="phone"><div class="menu"><div><span>&#8615;</span>Downloads</div><div><span>&#9719;</span>History</div><div><span>&#9783;</span>Bookmarks</div><div><span>&#8679;</span>Share</div><div class="hl"><span>&#8853;</span>Add page to</div><div><span>&#9645;</span>Desktop site</div><div><span>&#9881;</span>Settings</div></div>
+<div class="menu" style="margin-top:8px"><div style="color:#9aa3b2;font-size:11px">Add current webpage to</div><div><span>&#9783;</span>Bookmarks</div><div><span>&#9889;</span>Quick access</div><div class="hl"><span>&#8853;</span>Home screen</div><div><span>&#8615;</span>Saved pages</div></div></div></div></div>
+<div class="step"><div class="n">3</div><div><p>Tap <b>Add</b> (or <b>Install</b>).</p>
+<div class="phone"><div class="dlg"><div class="row"><img src="./icon-192.png" alt=""><div><b>__TITLE__</b><small>__HOST__</small></div></div><div class="acts"><span>Cancel</span><span class="go">Add</span></div></div></div></div></div>
+</section>
+
+<div class="after">
+<div class="step"><div class="n">4</div><div><p>Close the browser and open <b>__TITLE__</b> from your home screen - it opens full screen like any other app.</p></div></div>
+<div class="step"><div class="n">5</div><div><p>Tap <b>Nearest overnight doors to me now</b> and <b>allow location</b> when the phone asks. That is it.</p>
+<small>Your location is used on the phone only and never sent anywhere.</small></div></div>
+</div>
+<p class="help">Trouble getting it on your phone? __CONTACT_HTML__ &nbsp;<a href="./privacy.html">Privacy</a></p>
+<a class="btn grey" href="./index.html">Skip for now - use it in the browser</a>
+</main>
+<script>
+const ua=navigator.userAgent||'';
+const isIOS=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isAndroid=/Android/i.test(ua);const isSamsung=/SamsungBrowser/i.test(ua);
+const inAppName=(ua.match(/Instagram|FBAN|FBAV|FB_IAB|Messenger|TikTok|musical_ly|Snapchat|LinkedIn|Pinterest|Twitter/i)||[])[0];
+const inApp=!!inAppName||(isAndroid&&/; wv\)/.test(ua));
+const appLabel={FBAN:'Facebook',FBAV:'Facebook',FB_IAB:'Facebook',musical_ly:'TikTok'}[inAppName]||inAppName||'this app';
+const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+const here=location.href.split('#')[0];
+function show(p){document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='p-'+p));document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>show(b.dataset.p));
+show(isIOS?'ios':isSamsung?'samsung':'android');
+if(!isIOS&&!isAndroid){document.getElementById('desk').hidden=false;document.getElementById('here').textContent=here;}
+if(standalone){document.getElementById('done').hidden=false;}
+else if(inApp){const w=document.getElementById('inapp');w.hidden=false;
+ if(isAndroid){w.innerHTML='<b>You are inside '+appLabel+'\'s own browser</b>, which cannot save apps to the home screen.<a class="btn" href="intent://'+location.host+location.pathname+'#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='+encodeURIComponent(here)+';end">Open this page in Chrome</a>If nothing happens: tap &#8942; in the top corner, then <b>Open in Chrome</b> (or Open in browser), and follow the steps below there.';}
+ else if(isIOS){w.innerHTML='<b>You are inside '+appLabel+'\'s own browser</b>, which cannot save apps to the home screen.<a class="btn" href="x-safari-'+here+'">Open this page in Safari</a>If nothing happens: tap &bull;&bull;&bull; in the corner, then <b>Open in Safari</b> (or Open in external browser), and follow the steps below there.';}
+ else{w.innerHTML='<b>You are inside '+appLabel+'\'s own browser.</b> Open this page in Safari or Chrome to save it: tap the menu in the corner and choose <b>Open in browser</b>.';}}
+let deferredInstall=null;const ib=document.getElementById('installbtn');
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;if(!standalone&&!inApp)ib.hidden=false;});
+ib.onclick=async()=>{if(!deferredInstall)return;ib.disabled=true;deferredInstall.prompt();const r=await deferredInstall.userChoice;deferredInstall=null;ib.hidden=true;ib.disabled=false;if(r&&r.outcome==='accepted'){document.getElementById('done').hidden=false;}};
+window.addEventListener('appinstalled',()=>{ib.hidden=true;document.getElementById('done').hidden=false;});
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+</script></body></html>"""
+
 _PWA_SW = r"""const VERSION='__VERSION__';const PRECACHE=__PRECACHE__;
 self.addEventListener('install',e=>{e.waitUntil(caches.open('vet-'+VERSION).then(c=>Promise.allSettled(PRECACHE.map(u=>c.add(u)))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!=='vet-'+VERSION&&k!=='tiles'&&k!=='mymaps').map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
@@ -1418,18 +1555,33 @@ self.addEventListener('fetch',e=>{
    try{const r=await fetch(e.request);c.put(e.request,r.clone());trim(c);return r;}catch(err){return new Response('',{status:504});}}));
   return;}
  if(u.origin===self.location.origin){
+  if(u.pathname.endsWith('/sponsor.json')){e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));return;}
   e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(hit=>hit||fetch(e.request).then(r=>{if(r.ok&&u.pathname.indexOf('/map-')<0){const cp=r.clone();caches.open('vet-'+VERSION).then(c=>c.put(e.request,cp));}return r;})));
  }
 });"""
 
 
+def _qr_svg(text):
+    """QR code as inline SVG for the install page's desktop view (needs the optional `qrcode` package; blank without it)."""
+    try:
+        import qrcode, qrcode.image.svg
+    except ImportError:
+        return ""
+    img = qrcode.make(text, image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=1)
+    svg = img.to_string(encoding="unicode")
+    svg = re.sub(r"<\?xml[^>]*\?>", "", svg).replace('width="', 'data-w="', 1).replace('height="', 'data-h="', 1)
+    return '<div class="qr">' + svg + "</div>"
+
+
 def build_pwa(map_files=(), out_dir="pwa", title="Vet locator", subtitle="", app_url="", short_name="Vet locator",
-              builtin=None, description="", contact="", stamp="Sept 2026"):
+              builtin=None, description="", contact="", stamp="Sept 2026", site_url=""):
     """Packages the phone app as a flat folder (nothing to lose in an upload).  Each person's maps are added on their
     own phone and stay there; map_files are optional preloaded maps for a personal build.  builtin is a DataFrame of
     verified overnight clinics (name, town, lat, lng, phone, hours, typ) that powers 'Nearest overnight doors' from
-    the first open.  app_url is the live Streamlit builder.  Host the folder on any static site (GitHub Pages is free)."""
+    the first open.  app_url is the live Streamlit builder; site_url is where this folder will be hosted (used for the
+    link preview and the QR code on install.html, the page to send people).  Host the folder on any static site."""
     out = pathlib.Path(out_dir); out.mkdir(parents=True, exist_ok=True)
+    site_url = (site_url.rstrip("/") + "/") if site_url else ""
     css, js, icon_js = _leaflet_files()
     (out / "leaflet.css").write_text(css, encoding="utf-8"); (out / "leaflet.js").write_text(js, encoding="utf-8")
     (out / "leaflet-icons.js").write_text(icon_js, encoding="utf-8")
@@ -1468,6 +1620,11 @@ def build_pwa(map_files=(), out_dir="pwa", title="Vet locator", subtitle="", app
     apphost = re.sub(r"^https?://", "", app_url).rstrip("/") if app_url else "the builder"
     (out / "privacy.html").write_text(_PWA_PRIVACY.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__APPHOST__", _esc(apphost))
                                       .replace("__CONTACT__", _esc(contact or "the app publisher")), encoding="utf-8")
+    sitehost = re.sub(r"^https?://", "", site_url).rstrip("/") if site_url else "your-site.github.io"
+    (out / "install.html").write_text(_PWA_INSTALL.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__SITE__", _esc(site_url or "./"))
+                                      .replace("__HOST__", _esc(sitehost)).replace("__DESC__", _esc(description or subtitle))
+                                      .replace("__QR__", _qr_svg(site_url + "install.html") if site_url else "")
+                                      .replace("__CONTACT_HTML__", (f'Email <a href="mailto:{_esc(contact)}">{_esc(contact)}</a>.' if contact else "Reply to whoever sent you this link.")), encoding="utf-8"); pre.append("./install.html")
     (out / "manifest.webmanifest").write_text(json.dumps({
         "id": "./", "name": title, "short_name": short_name, "description": description or subtitle,
         "start_url": "./index.html", "scope": "./", "display": "standalone", "orientation": "portrait", "lang": "en-US",
@@ -1477,6 +1634,8 @@ def build_pwa(map_files=(), out_dir="pwa", title="Vet locator", subtitle="", app
                   {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}, indent=1), encoding="utf-8")
     (out / "icon-192.png").write_bytes(_icon_png(192)); (out / "icon-512.png").write_bytes(_icon_png(512))
     (out / ".nojekyll").write_text("", encoding="utf-8")
+    if not (out / "sponsor.json").exists():                 # one sponsored card on the home page; edit this file on the site to run it
+        (out / "sponsor.json").write_text(json.dumps({"enabled": False, "title": "Sponsor title", "text": "One line of text.", "url": "https://example.com"}, indent=1), encoding="utf-8")
     digest.update(app_url.encode()); digest.update(_PWA_INDEX.encode())
     (out / "sw.js").write_text(_PWA_SW.replace("__VERSION__", digest.hexdigest()[:10]).replace("__PRECACHE__", json.dumps(pre)), encoding="utf-8")
     (out / "README.md").write_text(
@@ -1485,9 +1644,15 @@ def build_pwa(map_files=(), out_dir="pwa", title="Vet locator", subtitle="", app
         "1. Create a **public** repository on GitHub and upload every file in this folder (loose files, no sub-folders) with **Add file -> Upload files**. "
         "`.nojekyll` is a hidden file; if the upload box skips it, create it with Add file -> Create new file (empty).\n"
         "2. Repository **Settings -> Pages -> Build and deployment -> Source: Deploy from a branch**, branch `main`, folder `/ (root)`, **Save**.\n"
-        "3. After a minute the same page shows the address, e.g. `https://<user>.github.io/<repo>/`. Open it on the phone and add it to the home screen.\n\n"
+        "3. After a minute the same page shows the address, e.g. `https://<user>.github.io/<repo>/`.\n\n"
+        "## The link to send people\n\n`.../install.html` - it explains that this is a web app, detects the phone (and the Instagram/Facebook in-app browser, which cannot install apps), "
+        "offers a one-tap Install button where the browser supports it, and shows illustrated Add-to-Home-Screen steps for Safari, Chrome and Samsung Internet. "
+        "On a computer it shows a QR code. Pass `site_url` to `build_pwa` so the QR code and link preview point at the right address.\n\n"
         "## Adding a map on a phone\n\nBuild it in the live builder, tap **Save the map**, then on the app's home page tap **Add a saved map file** and pick the file. "
         "It is stored on that phone only and works without signal.\n\n"
+        "## Sponsored card\n\n`sponsor.json` controls one sponsored card on the home page: set `enabled` to true and fill in `title`, `text` and `url` "
+        "(an affiliate or sponsor link). It is fetched fresh on every online open, so editing the file on the site changes it immediately. "
+        "If you run it, declare 'Contains ads' in the Play listing.\n\n"
         "## Store listing\n\nhttps://www.pwabuilder.com packages this hosted app for Google Play and the App Store; `privacy.html` is the privacy policy page the stores ask for.\n",
         encoding="utf-8")
     return sorted(str(p.relative_to(out)) for p in out.rglob("*") if p.is_file())
