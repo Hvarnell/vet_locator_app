@@ -1309,36 +1309,38 @@ def _fetch_bytes(url):
 
 
 def _icon_png(size, maskable=False):
-    """The icon: a red map pin with a white paw standing on a small night-mode street map (major roads, a grid of
-    side streets, a park) on a dark tile.  maskable=True draws everything smaller so Android's circle/squircle masks
-    never clip it.  Drawn at 1024 px and downsampled so edges stay smooth."""
+    """The icon: a red map pin with a white paw standing on a small street map in the familiar light map style (cream
+    land, white side streets, yellow and orange main roads, green parks, a blue pond).  maskable=True draws everything
+    smaller so Android's circle/squircle masks never clip it.  Drawn at 1024 px and downsampled so edges stay smooth."""
     import io
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageFilter
     S = 1024
     k = 0.78 if maskable else 1.0
     P = lambda x, y: (S * (0.5 + (x - 0.5) * k), S * (0.5 + (y - 0.5) * k))        # scale a point toward the centre
     W = lambda w: max(2, int(S * w * k))
-    im = Image.new("RGBA", (S, S), "#0e1116")
-    # --- the map, drawn on its own layer and clipped to a rounded plate ---
-    mp = Image.new("RGBA", (S, S), (0, 0, 0, 0)); m = ImageDraw.Draw(mp)
-    x0, y0 = P(0.08, 0.54); x1, y1 = P(0.92, 0.93)
-    m.rounded_rectangle([x0, y0, x1, y1], radius=int(S * 0.08 * k), fill="#1b2433")
-    m.polygon([P(0.60, 0.60), P(0.78, 0.57), P(0.90, 0.66), P(0.84, 0.80), P(0.66, 0.78)], fill="#17373f")       # park
-    m.polygon([P(0.08, 0.84), P(0.20, 0.82), P(0.26, 0.93), P(0.08, 0.93)], fill="#17373f")                       # park
-    minor, major = "#39475c", "#7d8ca6"
-    for i in range(1, 15):                                                             # side-street grid
-        x = 0.08 + i * 0.06; m.line([P(x, 0.54), P(x + 0.015, 0.93)], fill=minor, width=W(0.007))
-    for j in range(1, 7):
-        y = 0.54 + j * 0.056; m.line([P(0.08, y), P(0.92, y - 0.012)], fill=minor, width=W(0.007))
-    m.line([P(0.30, 0.54), P(0.30, 0.93)], fill=major, width=W(0.020))                                            # avenue
-    m.line([P(0.08, 0.705), P(0.92, 0.705)], fill=major, width=W(0.020))                                           # boulevard
-    m.line([P(0.56, 0.54), P(0.60, 0.64), P(0.70, 0.70), P(0.86, 0.72), P(0.92, 0.80)], fill=major, width=W(0.017), joint="curve")  # parkway
-    m.line([P(0.62, 0.93), P(0.70, 0.86), P(0.84, 0.86), P(0.92, 0.90)], fill="#5a6a84", width=W(0.011), joint="curve")
-    im.alpha_composite(mp)
-    d = ImageDraw.Draw(im)
-    # --- the pin ---
+    LAND, PARK, WATER = "#f3f1ea", "#c3e6b4", "#a9d3f3"
+    MINOR, MINOR_EDGE, MAJOR, MAJOR_EDGE, HWY, HWY_EDGE = "#ffffff", "#dad6cc", "#f9d978", "#e2b94e", "#f6a95b", "#d9853a"
+    im = Image.new("RGBA", (S, S), LAND); m = ImageDraw.Draw(im)
+    # parks and water
+    m.polygon([P(0.56, 0.04), P(0.80, 0.02), P(0.98, 0.14), P(0.90, 0.34), P(0.66, 0.30)], fill=PARK)
+    m.polygon([P(0.02, 0.70), P(0.22, 0.66), P(0.30, 0.84), P(0.18, 0.98), P(0.02, 0.98)], fill=PARK)
+    m.ellipse([*P(0.70, 0.62), *P(0.96, 0.80)], fill=WATER)
+    # side streets: white with a faint edge
+    for i in range(1, 16):
+        x = 0.02 + i * 0.062
+        m.line([P(x, 0.0), P(x + 0.03, 1.0)], fill=MINOR_EDGE, width=W(0.016)); m.line([P(x, 0.0), P(x + 0.03, 1.0)], fill=MINOR, width=W(0.010))
+    for j in range(1, 16):
+        y = 0.02 + j * 0.062
+        m.line([P(0.0, y), P(1.0, y - 0.03)], fill=MINOR_EDGE, width=W(0.016)); m.line([P(0.0, y), P(1.0, y - 0.03)], fill=MINOR, width=W(0.010))
+    # main roads: yellow with a darker edge; one orange highway curving through
+    for pts, w in [([P(0.33, 0.0), P(0.33, 1.0)], 0.040), ([P(0.0, 0.58), P(1.0, 0.55)], 0.040)]:
+        m.line(pts, fill=MAJOR_EDGE, width=W(w)); m.line(pts, fill=MAJOR, width=W(w * 0.62))
+    hwy = [P(0.60, 1.0), P(0.64, 0.80), P(0.76, 0.60), P(0.92, 0.48), P(1.0, 0.36)]
+    m.line(hwy, fill=HWY_EDGE, width=W(0.046), joint="curve"); m.line(hwy, fill=HWY, width=W(0.030), joint="curve")
+    # the pin, with a soft shadow on the ground
     cx, cy = P(0.5, 0.40); R = S * 0.24 * k; tip = P(0.5, 0.80)[1]
-    d.ellipse([cx - S * 0.14 * k, tip - S * 0.045 * k, cx + S * 0.14 * k, tip + S * 0.045 * k], fill="#0b0e13")  # ground shadow
+    sh = Image.new("RGBA", (S, S), (0, 0, 0, 0)); ImageDraw.Draw(sh).ellipse([cx - S * 0.15 * k, tip - S * 0.05 * k, cx + S * 0.15 * k, tip + S * 0.05 * k], fill=(0, 0, 0, 110))
+    im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(int(S * 0.02)))); d = ImageDraw.Draw(im)
     d.ellipse([cx - R, cy - R, cx + R, cy + R], fill="#ff5252")
     d.polygon([(cx - R * 0.72, cy + R * 0.69), (cx + R * 0.72, cy + R * 0.69), (cx, tip)], fill="#ff5252")
     pr, py = R * 0.52, cy + R * 0.02
