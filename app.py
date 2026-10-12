@@ -1,4 +1,4 @@
-"""VetAlong - shareable map builder (phone-first layout).
+"""MapAVet - shareable map builder (phone-first layout).
 
 Run locally:   pip install -r requirements.txt && streamlit run app.py
 Share online:  push this folder to GitHub and deploy on https://share.streamlit.io (free) - see README.md
@@ -18,22 +18,23 @@ def _secret(name, default=""):
 # A Google Places key (optional) gives ratings, phones and hours for every clinic; without it the app uses OpenStreetMap.
 if _secret("GOOGLE_MAPS_API_KEY"):
     os.environ["GOOGLE_MAPS_API_KEY"] = _secret("GOOGLE_MAPS_API_KEY")
-os.environ.setdefault("VET_LOCATOR_CONTACT", _secret("VET_LOCATOR_CONTACT", "VetAlong streamlit app"))
+os.environ.setdefault("VET_LOCATOR_CONTACT", _secret("VET_LOCATOR_CONTACT", "MapAVet streamlit app"))
+APP_ORIGIN = _secret("MAPAVET_ORIGIN", "https://hvarnell.github.io")   # the phone app that embeds this builder (one-tap save goes only there)
 
 import vetlocator as vl   # noqa: E402  (reads the environment at import time)
 
 APP_DIR = pathlib.Path(__file__).resolve().parent
 STATIC_MAPS = APP_DIR / "static" / "maps"          # served at app/static/maps/... when enableStaticServing is on (.streamlit/config.toml)
 
-st.set_page_config(page_title="VetAlong", page_icon=":dog:", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="MapAVet", page_icon=":dog:", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""<style>
 .block-container{padding-top:1.2rem;padding-bottom:2rem}
 h1{font-size:1.5rem !important;margin-bottom:0.2rem}
 div[data-testid="stMetric"]{background:#1a212c;border-radius:10px;padding:8px 12px}
 </style>""", unsafe_allow_html=True)
-st.title("VetAlong")
-st.caption("Every vet door along a drive or around an address: 24/7 ERs, night clinics, extended-hours and daytime GPs, "
-           "with phone, hours and rating. Hand-verified listings (Denver metro, Denver-Flint, Denver-League City) always included.")
+st.title("MapAVet")
+st.caption("Every veterinary clinic along a drive or around an address: 24/7 ERs, night clinics, extended-hours and daytime practices "
+           "with address, hours, phone and directions. Hand-verified listings (Denver metro, Denver-Michigan, Denver-Houston) always included.")
 
 mode = st.radio("What do you need?", ["Driving corridor", "Home base"], horizontal=True, label_visibility="collapsed")
 
@@ -79,6 +80,26 @@ def _publish(page_html):
         return f"app/static/maps/{name}"
     except OSError:
         return None
+
+
+def _save_button(page_html, name):
+    """One-tap save when the builder is open inside the MapAVet phone app: posts the finished page to the app, which
+    stores it under My maps.  Shows nothing when the builder is open in a plain browser tab."""
+    import json as _json
+    snippet = ("<!DOCTYPE html><html><head><meta charset='utf-8'><style>body{margin:0;font-family:system-ui,sans-serif}"
+               "button{display:none;width:100%;background:#1f7a4d;color:#fff;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:700;cursor:pointer}"
+               ".ok{display:none;color:#7fe0a0;font-size:14px;padding:8px 0}</style></head><body>"
+               "<button id='b'>&#128190; Save to this phone (My maps)</button><div class='ok' id='ok'>Saved - it is under My maps on the app's home page.</div>"
+               "<script>const H=" + _json.dumps(page_html) + ",N=" + _json.dumps(name) + ",O=" + _json.dumps(APP_ORIGIN) + ";"
+               "const b=document.getElementById('b');if(window.top!==window.parent){b.style.display='block';}"
+               "b.onclick=()=>{window.top.postMessage({type:'vetmap',html:H,name:N},O);b.style.display='none';document.getElementById('ok').style.display='block';};"
+               "</script></body></html>")
+    page_file = pathlib.Path(tempfile.gettempdir()) / f"vetsave_{hashlib.md5(page_html.encode()).hexdigest()[:10]}.html"
+    page_file.write_text(snippet, encoding="utf-8")
+    if hasattr(st, "iframe"):
+        st.iframe(page_file, height=70)
+    else:
+        st.components.v1.html(snippet, height=70)
 
 
 def _show_page(page_html, height=900):
@@ -131,10 +152,11 @@ if go:
     url = _publish(res["html"])
     if url:
         st.link_button("Open the map full screen (tap-to-call and Near me work there)", url, use_container_width=True)
+    _save_button(res["html"], fname)
     _show_page(res["html"])
 
     d1, d2 = st.columns(2)
-    d1.download_button("Save the map (HTML - add it to the VetAlong phone app under My maps)", res["html"], file_name=fname + ".html", mime="text/html", use_container_width=True)
+    d1.download_button("Save the map file (HTML - for a computer, or to add to the MapAVet app by hand)", res["html"], file_name=fname + ".html", mime="text/html", use_container_width=True)
     d2.download_button("Save the table (CSV)", df.drop(columns=["er_hint"], errors="ignore").to_csv(index=False),
                        file_name=fname + ".csv", mime="text/csv", use_container_width=True)
 

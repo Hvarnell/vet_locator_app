@@ -432,6 +432,15 @@ NOISE_RE = re.compile(r"groom|day ?care|boarding|kennel|cafe|grill|adoption|shel
                       r"\bdogg\b|dog walk|pet sitting|crematory|cremation|taxiderm|rehab", re.I)
 
 
+def sched_compact(sched):
+    """Schedule -> plain lists the phone app can read: 7 days (Mon..Sun), each [[open_min, close_min], ...];
+    a 24-hour day is [[0, 1440]]; None when the hours are unknown."""
+    if not sched or not any(sched.values()):
+        return None
+    return [[[0, 1440]] if any(iv[2] for iv in sched.get(d, [])) else [[int(iv[0]), int(iv[1])] for iv in sched.get(d, [])]
+            for d in range(7)]
+
+
 def classify_row(hours_text, sched, name):
     """-> (type, display hours).  Unknown hours on an emergency-sounding name get flagged for a call."""
     typ = classify_schedule(sched)
@@ -444,238 +453,238 @@ def classify_row(hours_text, sched, name):
 # vetlocator | 4 curated
 # The 231 clinics hand-verified against Google listings (Sept 2026) for Harley's three maps:
 # Denver metro (home), Denver-Flint (I-76/I-80/I-69, with the I-94 variant) and Denver-League City (I-25/US-287/I-45).
-CURATED_CSV = """name,town,lat,lng,phone,hours,rating,typ,corridor
-Sploot Veterinary Care,Arvada,39.8356,-105.0832,720-780-8874,DAILY 8am-8pm (Sun too),4.8,EXT,home
-Arvada Veterinary Hospital,Arvada,39.817,-105.0831,303-424-4439,Tu-F 8-6; M 9-5; Sa 8-4,4.6,DAY,home
-Church Ranch Veterinary Center,Westminster,39.8803,-105.0892,303-732-5819,"OPEN 24/7 (GP + urgent care, surgery)",4.3,ER,home
-Olde Town Veterinary Clinic,Arvada,39.8023,-105.0835,720-328-3301,M-F 8-5,4.9,DAY,home
-UrgentVet Broomfield,Broomfield,39.9145,-105.0488,303-622-1600,M-F 3-11pm; Sa-Su 10-8,4.7,NIGHT,home
-Animal Urgent Care - W 64th Ave,Arvada,39.8118,-105.1392,303-420-7387,OPEN 24/7,4.6,ER,home
-WRAH - Wheat Ridge Animal Hospital (HIS SPECIALTY HOME),Wheat Ridge,39.7771,-105.111,303-424-3325,"OPEN 24/7 + specialty: neuro (Dr. Djani), IM, surgery",4.1,ER,home
-RiNoVet Animal Emergency,Denver,39.778,-104.9797,303-458-5555,OPEN 24/7,4.2,ER,home
-Arvada Flats Veterinary Hospital,Arvada,39.8111,-105.1572,303-467-9212,M-F 8-7; Sa 8-1,4.8,EXT,home
-Northside Emergency Pet Clinic,Westminster,39.9225,-104.9986,303-252-7722,OPEN 24/7,4.2,ER,home
-VEG ER - Edgewater,Edgewater,39.7478,-105.0565,720-996-1200,OPEN 24/7,4.8,ER,home
-VEG ER - Colfax,Denver,39.7404,-104.9426,720-574-9834,OPEN 24/7,4.8,ER,home
-Evolution Veterinary Specialty & Emergency,Lakewood,39.7154,-105.1367,720-510-7707,OPEN 24/7,4.0,ER,home
-BluePearl Pet Hospital - Lafayette,Lafayette,39.9874,-105.1167,720-699-7766,OPEN 24/7 specialty + ER,4.6,ER,home
-VRCC Veterinary Specialty & Emergency,Englewood,39.6524,-104.9987,303-923-5790,OPEN 24/7,4.2,ER,home
-VEG ER - Hampden,Denver,39.6534,-104.9171,720-739-6003,OPEN 24/7,4.7,ER,home
-CSU Veterinary Teaching Hospital - SURGICAL HOME (Dr. Monnet),Fort Collins,40.5719,-105.085,970-297-5000,OPEN 24/7 academic,4.4,ER,home
-Animal Care Hospital of Morris,Morris IL,41.3715,-88.4244,815-941-9924,M-F 8-5; Sa 8-12,4.8,DAY,flint
-Pine Bluff Animal Hospital,Morris IL,41.3454,-88.2681,815-942-5365,M-F 8-5:30; Sa 8-12,4.8,DAY,flint
-Lakewood Animal Hospital,Morris IL,41.369,-88.4426,815-942-1199,M/Tu/Th/F 8-5:30,4.9,DAY,flint
-Parkview Animal Hospital,Newton IA,41.6995,-93.0265,641-792-0340,M-F 8-5,4.7,DAY,flint
-Newton Animal Clinic,Newton IA,41.6988,-93.0826,641-433-4815,M-F 8-5,4.6,DAY,flint
-Riverside Animal Hospital,Kearney NE,40.6759,-99.0977,308-234-2617,M-F 8-5:30; Sa 8-12,4.6,DAY,flint
-Arbor View Animal Hospital (US-6),Valparaiso IN,41.5498,-87.1141,219-762-7267,M/Tu/Th 8-8pm; W/F 8-6; Sa 8-1,4.7,EXT,flint
-Valparaiso Animal Hospital,Valparaiso IN,41.4761,-87.0568,219-462-1862,M-F 7-6; Sa 8-2,4.6,DAY,flint
-McAfee Animal Hospital,Valparaiso IN,41.4617,-87.0175,219-462-5901,M-F 8-12 & 1:30-5:30; Sa 8-12,4.8,DAY,flint
-All Creature Features Animal Hospital,La Porte IN,41.5452,-86.7017,219-393-3558,M-F 7:30-6; Sa 7-1,4.6,DAY,flint
-LaPorte Animal Hospital,La Porte IN,41.5967,-86.7442,219-362-2612,M-W 8-5:30; F 8-5,4.5,DAY,flint
-Michigan City Animal Hospital,Michigan City IN,41.7079,-86.868,219-872-4191,M-F 7-6; Sa 8-12; SUN 1-7pm,4.8,EXT,flint
-St Joseph Animal Wellness Clinic,St Joseph MI,42.0723,-86.4786,269-429-6966,M-F 8-5:30 (Tu/Th to 6),4.9,DAY,flint
-Nickerson Animal Health Center,Benton Harbor MI,42.0747,-86.436,269-925-8835,M-F 8-6 (midday close),4.7,DAY,flint
-Sunset Coast Veterinary Clinic,St Joseph MI,42.0439,-86.4348,269-408-0468,M-F ~8-5 (Tu/Th to 6),4.7,DAY,flint
-Steiner SILS Affordable Vet Care,Fort Morgan CO,40.2537,-103.8257,970-441-1503,M-Tu 7:30-5; W 7:30-4; Th-Su closed,4.6,DAY,flint
-Fort Morgan Veterinary Clinic,Fort Morgan CO,40.2472,-103.783,970-867-9477,M-F 8-5; Sa 9-12,4.5,DAY,flint
-Red Arrow Animal Clinic,Paw Paw MI,42.2143,-85.9213,269-657-7081,M-W/F 8-5,4.2,DAY,flint
-Paw Paw Veterinary Clinic,Paw Paw MI,42.2229,-85.8597,269-657-3114,M-Th 8-7pm; F 8-5; Sa 8-1; Su 9-11am,4.8,EXT,flint
-Sterling Animal Clinic,Sterling CO,40.6247,-103.2325,970-521-0333,M-F 8-4,4.0,DAY,flint
-Veterinary Medical Clinic,Sterling CO,40.6246,-103.199,970-522-3321,M-F 8-5; Sa 8-12,4.5,DAY,flint
-Town & Country Animal Hospital,Charlotte MI,42.5226,-84.8365,517-543-2330,M/W 8-7pm; Tu/Th/F 8-5; Sa 8-12,4.6,EXT,flint
-Apple Grove Veterinary Care,Charlotte MI,42.5525,-84.8016,517-543-6101,M/Tu/Th 8-7pm; W/F 8-5,4.6,EXT,flint
-Baltzell Veterinary Hospital,Ogallala NE,41.126,-101.7386,308-284-4313,M-F 8-5:30; Sa 8-12,4.8,DAY,flint
-Animal Clinic & Pharmacy,Ogallala NE,41.1226,-101.7367,308-284-2182,M-F 8-5; Sa 8-12,4.7,DAY,flint
-Westfield Small Animal Clinic,North Platte NE,41.1347,-100.7851,308-534-4480,M-F 8-6; Sa 8-3,4.5,DAY,flint
-Tender Hearts Veterinary Center,North Platte NE,41.1333,-100.7778,308-221-6915,M-F 8-5:30,4.5,DAY,flint
-America's Heartland Animal Center,North Platte NE,41.0994,-100.7652,308-532-4880,M-F 7:30-5; Sa 8-12,4.4,DAY,flint
-Stockman's Veterinary Clinic,North Platte NE,41.1658,-100.7583,308-532-7210,M-F 8-5:30; Sa 8-12,4.7,DAY,flint
-B & B Veterinary Services,Lexington NE,40.8064,-99.7477,308-324-3411,M-F 8-12 & 1-5; Sa 8-10am,4.8,DAY,flint
-Lexington Animal Clinic,Lexington NE,40.7819,-99.7622,308-324-2411,M-F 8:30-5,4.6,DAY,flint
-Overton Veterinary Services,Overton NE,40.7504,-99.6158,308-324-7202,M-F 8-5:30; Sa 8-12,4.9,DAY,flint
-Beebout Veterinary Medical Center,Kearney NE,40.7125,-99.1215,308-236-5912,M-Sa 7:30-6,4.6,DAY,flint
-West Villa Animal Hospital,Kearney NE,40.699,-99.1157,308-244-8143,M-F 7:30-6; Sa 8-12; Su 4:30-6pm,4.5,DAY,flint
-Cottonwood Veterinary Clinic,Kearney NE,40.7322,-99.0855,308-234-8118,M 7:30-8pm; Tu-Th 7:30-6; F 8-6,4.6,EXT,flint
-Hilltop Pet Clinic,Kearney NE,40.7188,-99.0825,308-236-5912,M-F 7:30-9:30a & 3:30-6p; Sa 7:30-12; Su 3-6p,4.7,DAY,flint
-Northgate Veterinary Clinic,Kearney NE,40.7288,-99.0757,308-234-9512,M-F 8-5,4.7,DAY,flint
-Parks Veterinary,Grand Island NE,40.9557,-98.3985,308-384-6272,M-F 7:30-5; Sa 8-12,4.8,DAY,flint
-Grand Island Veterinary Hospital,Grand Island NE,40.9139,-98.379,308-384-1641,M-F 8-5,4.5,DAY,flint
-Pet Hospital,Grand Island NE,40.9136,-98.3787,308-384-4363,M-F 8-5; Sa 9-12,5.0,DAY,flint
-Family Pet Clinic,Grand Island NE,40.9472,-98.3857,308-384-6147,M-F 8-5,4.6,DAY,flint
-Animal Medical Clinic,Grand Island NE,40.9026,-98.338,308-382-6330,M-F 7:30-5; Sa 8-12,4.7,DAY,flint
-South Locust Veterinary Clinic,Grand Island NE,40.9049,-98.3404,308-382-6412,M-F 8-5:30,4.7,DAY,flint
-York Animal Clinic,York NE,40.8755,-97.5933,402-362-2894,M-F 7:30-5:30; Sa 7:30-12,4.8,DAY,flint
-Sullivan Companion Animal Clinic,York NE,40.8656,-97.5928,402-745-6498,M-F 8-5; Sa 8-11am,4.7,DAY,flint
-Vondra Veterinary Clinic,Lincoln NE,40.7851,-96.7537,402-477-1113,M-F 7:30-6; Sa 8-12,4.8,DAY,flint
-Veterinary Emergency Services,Lincoln NE,40.7762,-96.7069,402-629-6925,NIGHT ER: M-F 6pm-7am; Sa noon-mid; Su 24h,4.4,NIGHT,flint
-Nebraska Animal Medical Center,Lincoln NE,40.7545,-96.643,402-423-9100,M-F 7am-8pm; Sa-Su 8-5 (7 days!),4.3,EXT,flint
-Pitts Veterinary Hospital,Lincoln NE,40.7695,-96.6885,402-423-4120,M-F 7-6; Sa 9-3,4.6,DAY,flint
-Animal Care Clinic,Lincoln NE,40.8115,-96.6065,402-566-5056,M-F 7:30-6,4.8,DAY,flint
-Clock Tower Animal Clinic,Lincoln NE,40.8178,-96.6299,402-489-6228,M-F 7:30-6,4.8,DAY,flint
-Polaris Veterinary Center,Lincoln NE,40.8342,-96.5666,402-467-4469,M/W 7:30-8pm; Tu/Th/F 7:30-6; Sa 7:30-1,4.7,EXT,flint
-Urgent Pet Care West,Omaha NE,41.2169,-96.1378,402-234-8834,Daily 8am-MIDNIGHT,4.3,NIGHT,flint
-The Pet Clinic,Omaha NE,41.2365,-96.1339,402-330-3096,M-Th 8-7; F 8-6; Sa 8-2,4.8,DAY,flint
-VCA MidWest Referral & Emergency,Omaha NE,41.2094,-96.0652,402-513-8741,M-Th 24h; F to 6am; Sa closed; Su 4pm-mid — CALL FIRST,3.4,NIGHT,flint
-VEG ER for Pets - Omaha,Omaha NE,41.2917,-96.1191,402-205-7271,OPEN 24/7,4.8,ER,flint
-Omaha Animal Medical Group,Omaha NE,41.2903,-96.1014,402-496-6075,M-F 7:30-6; Sa 8-12,4.8,DAY,flint
-VCA 80 Dodge Animal Hospital,Omaha NE,41.2614,-96.0411,402-399-8100,M-Sa 7am-8pm; Su 10-6 (7 days),4.6,EXT,flint
-Lone Tree Animal Care Center,Omaha NE,41.255,-95.9474,402-389-3356,M 8-8p; Tu 8-5; W 12-8p; Th 8-5; F 8-4,4.8,DAY,flint
-24th Street Animal Clinic,Omaha NE,41.2284,-95.9474,402-345-2211,M-F 7:30-6,4.5,DAY,flint
-Council Bluffs Veterinary Clinic,Council Bluffs IA,41.2498,-95.8484,712-323-2147,M-F 8-5:30,4.6,DAY,flint
-Strohbehn Veterinary Clinic,Council Bluffs IA,41.2201,-95.8525,712-366-0556,M-F 8-5:30; Sa 8-12,4.4,DAY,flint
-Valley View Veterinary Clinic,Council Bluffs IA,41.2331,-95.8176,712-256-7387,M-F 8-5:30; Sa 8-12,4.7,DAY,flint
-The Animal Clinic,Council Bluffs IA,41.2596,-95.8132,712-323-0598,M/Tu/Th/F 7-5:30; W 7-12; Sa 7-12,4.4,DAY,flint
-VEG ER for Pets - West Des Moines,West Des Moines IA,41.5729,-93.8012,515-259-6473,OPEN 24/7,4.9,ER,flint
-UrgentVet West Des Moines,West Des Moines IA,41.5611,-93.7719,515-215-9696,M-F 3-11pm; Sa-Su 10-8,4.7,NIGHT,flint
-Animal Doctors Veterinary Clinic,West Des Moines IA,41.5581,-93.7691,515-225-9555,M-F 7-6; Sa 8-12,4.8,DAY,flint
-Animal Care Clinic West & Metro Cat,West Des Moines IA,41.6,-93.7443,515-224-4368,M-Th 7-7; F 7-6,4.6,EXT,flint
-Iowa Veterinary Specialties,Des Moines IA,41.5597,-93.7019,515-280-3100,OPEN 24/7,3.6,ER,flint
-Grand Avenue Veterinary Hospital,West Des Moines IA,41.5824,-93.7061,515-274-3489,M-F 7:30-6,4.8,DAY,flint
-BluePearl Pet Hospital - Des Moines,Des Moines IA,41.6453,-93.697,515-727-4872,OPEN 24/7,4.3,ER,flint
-Grinnell Veterinary Clinic,Grinnell IA,41.7092,-92.7281,641-236-4461,M-F 8-5:30; Sa 8-12,4.7,DAY,flint
-All Pets Veterinary Hospital,Grinnell IA,41.7394,-92.7278,641-236-6869,M-W/F 8-5; Th 8-8pm; Sa 9-12,4.8,DAY,flint
-BluePearl Pet Hospital - Cedar Rapids,Cedar Rapids IA,41.8872,-91.6788,319-841-5161,OPEN 24/7 (25 min N of Iowa City via I-380),4.4,ER,flint
-Coralville Animal Hospital,Coralville IA,41.6764,-91.5822,319-351-6848,M-F 7:30-5:30,4.5,DAY,flint
-Goosetown Animal Hospital,Coralville IA,41.6708,-91.5701,319-341-0386,M-F 8-6; Sa 8-12,5.0,DAY,flint
-Gentle Heart Pet Clinic,Iowa City IA,41.6467,-91.5457,319-354-6696,M/Tu/F 8-5; W 8-7; Sa 8-12,4.7,DAY,flint
-Animal Clinic Inc.,Iowa City IA,41.6462,-91.5296,319-337-2123,M-F 7:30-5; Sa 8-12,4.8,DAY,flint
-Emergency Veterinary Service of Iowa City,Iowa City IA,41.6896,-91.4884,319-338-3605,DAYTIME ER: daily 8am-8pm (wknd to 6),3.2,EXT,flint
-Bright Eyes & Bushy Tails (same bldg),Iowa City IA,41.6895,-91.4884,319-351-4256,M-F 8-8; Sa-Su 8-6 (7 days),4.3,EXT,flint
-Care Animal Center,Davenport IA,41.5604,-90.5957,563-888-1000,M/F 8-5; Tu/Th 8-6; W 8-2; Sa 8-12,4.7,DAY,flint
-Animal Family Veterinary Care,Davenport IA,41.5813,-90.5708,563-391-9522,M-F 7-6; Sa 8-2,4.7,DAY,flint
-Twin Bridges Animal Hospital,Davenport IA,41.5758,-90.5146,563-355-5311,M-F 7:30-5:30; Sa 8-12,4.7,DAY,flint
-Animal Emergency Center Quad Cities,Bettendorf IA,41.5266,-90.493,563-344-9599,NIGHT ER: M-F 5pm-8am; Sa-Su 24h,3.5,NIGHT,flint
-Glenroads Veterinary Clinic,Bettendorf IA,41.551,-90.483,563-332-2999,M-F 7:45-5:30,4.9,DAY,flint
-Ancare Veterinary Hospital,La Salle IL,41.3536,-89.1055,815-223-1000,M-Th 7:30-7; F -6; Sa 8-5; Su 10-3 (7 days),4.4,EXT,flint
-Animal Care Center of Shorewood,Shorewood IL,41.5228,-88.1994,815-744-1500,M-F 7am-8pm; Sa 7-3,4.2,EXT,flint
-VCA Aurora Animal Hospital,Aurora IL,41.7648,-88.3855,630-301-6100,OPEN 24/7,3.4,ER,flint
-Premier Paws,Joliet IL,41.5394,-88.1789,815-729-1555,M 8-4; Tu-F 8-5,4.6,DAY,flint
-VCA Joliet Animal Hospital,Joliet IL,41.5267,-88.1315,815-729-0770,M-F 7-7; Sa 8-2,4.2,EXT,flint
-Essington Road Animal Hospital,Joliet IL,41.5561,-88.1605,815-439-2323,M/Tu/Th/F 8-12 & 1-6; W 8-12,4.7,DAY,flint
-UrgentVet Joliet,Joliet IL,41.5246,-88.1251,815-846-4600,M-F 3-11pm; Sa-Su 10-8,4.7,NIGHT,flint
-Animal Medical Center of Plainfield,Plainfield IL,41.6314,-88.2023,815-436-8387,OPEN 24/7,4.1,ER,flint
-VEG ER for Pets - Naperville,Naperville IL,41.707,-88.2051,630-503-7415,OPEN 24/7,4.7,ER,flint
-UrgentVet Naperville,Naperville IL,41.7617,-88.2053,630-686-2400,M-F 3-11pm; Sa-Su 10-8,4.6,NIGHT,flint
-Care Animal Clinic Urgent+Wellness,Naperville IL,41.7257,-88.1492,630-355-6164,M-Sa to 7-8pm; Su 9-6 (7 days),4.7,EXT,flint
-VCA Arboretum View Animal Hospital,Downers Grove IL,41.8067,-88.046,630-963-0424,OPEN 24/7,3.6,ER,flint
-VEG ER for Pets - Oak Brook,Oak Brook IL,41.8453,-87.9608,331-808-2720,OPEN 24/7,4.6,ER,flint
-Premier Veterinary Group - Orland Park,Orland Park IL,41.6032,-87.7902,708-388-3771,OPEN 24/7,4.2,ER,flint
-Premier Veterinary Group - Chicago,Chicago IL,41.9389,-87.7251,773-516-5800,OPEN 24/7,4.0,ER,flint
-MedVet Chicago,Chicago IL,41.9421,-87.6975,773-281-7110,OPEN 24/7,4.2,ER,flint
-Crossroads Animal Hospital,Crown Point IN,41.4756,-87.4072,219-319-0679,OPEN 24/7,3.5,ER,flint
-Merrillville Animal Hospital,Merrillville IN,41.5055,-87.3649,219-980-1531,M/Tu/Th 8-6; W 8-8pm; F-Su closed,4.3,DAY,flint
-Broadway Pet Hospital,Merrillville IN,41.4963,-87.3376,219-769-5733,M-F 8-6; Sa 8-1,4.8,DAY,flint
-EVCC Emergency Vet - Westville,Westville IN,41.581,-86.8926,219-785-7300,OPEN 24/7,4.7,ER,flint
-Family Pet Health Center,South Bend IN,41.6655,-86.2064,574-282-2303,M-F 8-5,4.8,DAY,flint
-EVCC Emergency Vet (South Bend metro),Mishawaka IN,41.7133,-86.1779,574-544-6200,OPEN 24/7,4.4,ER,flint
-Mishawaka Animal Care Center,Mishawaka IN,41.6946,-86.1832,574-255-4130,M/Th/F 8-5:30; Tu 8-6; W 8-12,4.7,DAY,flint
-Animal Care Clinic North,Elkhart IN,41.734,-85.9791,574-264-9521,M-F 7:30-5,4.8,DAY,flint
-Animal Aid Clinic South,Elkhart IN,41.6391,-85.9312,574-875-5102,M-F 8-6; Sa 8-1,4.5,DAY,flint
-Noah's Landing Pet Care Clinic,Elkhart IN,41.6932,-85.9147,574-293-4555,M-F 8-6; Sa 8-1,4.6,DAY,flint
-Pokagon Veterinary Hospital,Angola IN,41.6379,-85.0381,260-665-6023,M-Th 8-6; Sa 8-12,4.8,DAY,flint
-All Paws & Claws Veterinary Clinic,Angola IN,41.6593,-85.0022,260-665-5612,M/W 9-5; Tu/Th 9-8pm; F/Sa 9-12,4.8,EXT,flint
-Beechwood Veterinary Clinic,Angola IN,41.6664,-85.0015,260-665-2090,M-F 8-5,4.4,DAY,flint
-NIVES 24h Emergency & Specialty,Fort Wayne IN,41.134,-85.0613,260-426-1062,OPEN 24/7 (40 min S of I-69 jct),4.3,ER,flint
-Care Center Hospital for Animals,Coldwater MI,41.9372,-84.9514,517-278-5631,M-F 8-5; Sa 8-12,4.5,DAY,flint
-Tekonsha Animal Hospital (on I-69),Tekonsha MI,42.0995,-84.9855,517-767-3011,M/Tu/F 8-5:30; W 8-7pm; Th 8-5; Sa 8-12,4.7,DAY,flint
-VCA Specialty & Emergency Kalamazoo,Portage MI,42.2394,-85.5912,269-381-5228,OPEN 24/7,3.4,ER,flint
-Southside Veterinary Clinic,Battle Creek MI,42.218,-85.2038,269-979-1588,M-F 9-5; Sa 9-12,4.8,DAY,flint
-Kalamazoo Animal Hospital,Kalamazoo MI,42.259,-85.5794,269-381-1570,M-Th 8-6; F 8-5,4.5,DAY,flint
-Sprinkle Road Veterinary Clinic,Kalamazoo MI,42.2642,-85.5303,269-349-6060,M-W 7-6; Th/F 8-6; Sa 8-1,4.7,DAY,flint
-EVCC Kalamazoo West Main,Kalamazoo MI,42.2952,-85.6731,269-548-0400,24h wknds + some weekdays; closed Wed - CALL,4.8,NIGHT,flint
-Dickman Road Veterinary Clinic,Battle Creek MI,42.3196,-85.199,269-963-9347,M-F 7:30-6; Sa 8-12,4.4,DAY,flint
-DRVC On Columbia,Battle Creek MI,42.2988,-85.2123,269-441-3013,M-F 8-12 & 1-6,4.6,DAY,flint
-VCA Marshall Animal Hospital,Marshall MI,42.2837,-84.9651,269-781-5114,M-F 7:30-6,4.6,DAY,flint
-Brooklyn Road Veterinary Clinic,Jackson MI,42.1723,-84.2741,517-758-2729,M-Tu/Th-F 9-5; W 9-8pm; Sa 9-12,4.9,DAY,flint
-Miller Animal Clinic,Lansing MI,42.7403,-84.6444,517-321-6406,M-F 8am-8pm; Sa 9-5,4.5,EXT,flint
-Waverly Animal Hospital,Lansing MI,42.7319,-84.6021,517-323-4156,M-F 7am-8pm; Sa 8-4,4.3,EXT,flint
-Jolly Road Veterinary Hospital,Lansing MI,42.6826,-84.5092,517-977-1095,M/Tu/Th 8-5:30; W 10-7; F 8-5,4.6,DAY,flint
-Evergreen Veterinary Clinic,Lansing MI,42.7117,-84.5363,517-507-0053,M-W/F 8-5; Th 12-8pm,4.9,DAY,flint
-MSU Veterinary Medical Center,Lansing MI,42.7228,-84.4708,517-353-5420,OPEN 24/7 - academic hospital ON I-69,3.6,ER,flint
-Greater Lansing Veterinary Center,Williamston MI,42.6896,-84.3049,517-708-2525,"OPEN 24/7 (E of Lansing, Flint approach)",3.5,ER,flint
-Emergency Veterinary Hospital - Ann Arbor,Ann Arbor MI,42.2869,-83.834,734-369-6446,OPEN 24/7 (45 min S of Flint),3.8,ER,flint
-Animal Emergency Center - Novi,Novi MI,42.4687,-83.4743,248-348-1788,OPEN 24/7,3.8,ER,flint
-MedVet Commerce (Flint SE backup),Commerce Twp MI,42.544,-83.4576,248-960-7200,OPEN 24/7,4.3,ER,flint
-Cross Veterinary Clinic,Grand Blanc MI,42.9447,-83.678,810-406-1494,M/Tu 9-6; W-F 9-5,4.8,DAY,flint
-Animal Emergency Hospital,Burton MI (Flint),42.9739,-83.6872,810-238-7557,Daily 8am-MIDNIGHT (W/Th from noon),3.7,NIGHT,flint
-Grand Blanc Veterinary Hospital,Grand Blanc MI,42.942,-83.6469,810-694-8241,M-F 8:30-5; Sa 8:30-12,4.5,DAY,flint
-Briarwood Veterinary Hospital,Grand Blanc MI,42.9126,-83.6083,810-695-6055,M/Th 8-6; Tu/W/F 8-5:30; Sa 8-12,4.8,DAY,flint
-UrgentVet Parker,Parker CO,39.4934,-104.7585,720-835-1500,M-F 3-11pm; Sa-Su 10-8,4.6,NIGHT,texas
-Animal Care Center of Castle Pines,Castle Rock CO,39.47,-104.8743,303-688-3660,M-Th 7-7; F/Sa 7-6,4.8,EXT,texas
-Cherished Companions Animal Clinic,Castle Rock CO,39.4096,-104.8594,303-688-3757,M-F 8-6,4.7,DAY,texas
-Veterinary Specialists of the Rockies,Castle Rock CO,39.4071,-104.8543,303-660-1027,OPEN 24/7 specialty + ER,3.9,ER,texas
-North Springs Veterinary Referral Center,Colorado Springs CO,38.9838,-104.7958,719-920-4430,OPEN 24/7,4.4,ER,texas
-Animal ER Care,Colorado Springs CO,38.9082,-104.8184,719-260-7141,OPEN 24/7,4.2,ER,texas
-Southern Rockies Animal Emergency + Specialty,Colorado Springs CO,38.9161,-104.7179,719-473-0482,OPEN 24/7,3.6,ER,texas
-Pueblo Animal Urgent Care,Pueblo CO,38.3114,-104.6175,719-544-7788,NIGHT: M-F 4pm-midnight; Sa-Su noon-midnight,3.1,NIGHT,texas
-Pueblo Small Animal Clinic,Pueblo CO,38.2857,-104.5868,719-545-4350,M/Tu/Th/F 8-12 & 1-5:30,4.2,DAY,texas
-Veterinary Hospital Associates,Pueblo CO,38.2547,-104.6621,719-564-0330,M-F 8-5:30,4.5,DAY,texas
-Mesa Veterinary Clinic,Pueblo CO,38.2445,-104.5654,719-542-6075,M-F 7:30-5:30; Sa 7:30-12,4.5,DAY,texas
-Trinidad Animal Clinic,Trinidad CO,37.1769,-104.4891,719-846-3212,M-F 8-12 & 1-4; Sa 8:30-12,4.7,DAY,texas
-Fisher's Peak Vet Clinic,Trinidad CO,37.1564,-104.5121,719-846-3211,M-F 8-5; Sa 8-12,4.6,DAY,texas
-Mesa Vista Veterinary Hospital,Raton NM,36.87,-104.4408,575-445-3912,M-F 8-12 & 1-5,4.8,DAY,texas
-Raton Veterinary Hospital,Raton NM,36.8864,-104.4291,575-445-2691,M-W/F 8-5; Sa 8-11am,4.8,DAY,texas
-Clayton Veterinarian Clinic,Clayton NM,36.4386,-103.1755,575-374-2332,M-F 8-12 & 1-5; Sa 8-12,4.9,DAY,texas
-Twist Junction Veterinary Services,Dalhart TX,36.0419,-102.55,806-244-0110,M-F 8-12 & 1-5,4.8,DAY,texas
-Circle H Animal Health,Dalhart TX,36.0777,-102.5014,806-244-7851,M-F 8-5,4.8,DAY,texas
-Dumas Veterinary Services,Dumas TX,35.8624,-101.9723,806-922-6298,Tu/Th 8:30-5; Sa 8-12 only,5.0,DAY,texas
-Animal Medical Center,Amarillo TX,35.1999,-101.9081,806-358-7831,M-F 7:30-6; Sa 8-2; Su 8-1 (7 days),4.8,EXT,texas
-Small Animal Emergency Clinic,Amarillo TX,35.156,-101.8776,806-352-2277,NIGHT ER: M-Th 6:30pm-7:30am; F 6:30pm-mid; Sa-Su 24h,3.9,NIGHT,texas
-Swann Animal Clinic at 45th,Amarillo TX,35.1643,-101.874,806-355-9443,M-F 7am-8:30pm; Sa 8-5,4.7,EXT,texas
-Urgent Care at Swann,Amarillo TX,35.1642,-101.8738,806-355-9445,M-W/F 7am-8:30pm; Sa 8-5,4.1,EXT,texas
-Amarillo Vet Clinic,Amarillo TX,35.1999,-101.802,806-373-7454,M-F 9-5:30,4.1,DAY,texas
-Clarendon Veterinary Hospital,Clarendon TX,34.9332,-100.8767,806-874-3544,M-F 8-5,4.4,DAY,texas
-Childress Veterinary Hospital,Childress TX,34.442,-100.2396,940-937-2558,M-F 8-12 & 1:30-5,4.4,DAY,texas
-Critter Care Vet Clinic,Childress TX,34.4328,-100.2259,940-937-6065,M-Th 9-12 & 1-5; F 9-12,4.0,DAY,texas
-Main St Veterinary Clinic,Vernon TX,34.1375,-99.2843,940-553-3791,M-F 8:30-5:30,4.6,DAY,texas
-Lacy Veterinary Clinic,Vernon TX,34.156,-99.2634,940-552-7755,M-F 8-12 & 1-5,4.5,DAY,texas
-PETS Clinic (nonprofit),Wichita Falls TX,33.9548,-98.5266,940-723-7387,M-Th 8:30-5,4.8,DAY,texas
-Salt Creek Vet Urgent Care,Wichita Falls TX,33.8574,-98.5399,940-247-7207,LIMITED: M 7-7; W 5-8pm; Sa 1-5 - CALL FIRST,4.3,EXT,texas
-Animal Hospital of Wichita Falls,Wichita Falls TX,33.8807,-98.4945,940-767-4369,M-W/F 8-5:30; Th 8-12,4.7,DAY,texas
-Chisholm Trail Pet Clinic,Bowie TX,33.5663,-97.8573,940-872-8900,M-Th 8-5:30,4.8,DAY,texas
-Bowie Pet Clinic,Bowie TX,33.5588,-97.8505,940-872-3400,M/W/F 9-4; Tu/Th 9-6,4.6,DAY,texas
-Cross Timbers Veterinary Hospital,Bowie TX,33.5671,-97.8373,940-872-2161,M-F 8-5:30; Sa 8-12,4.7,DAY,texas
-Pet Health Center (US-287),Decatur TX,33.2578,-97.611,940-627-8387,M/W/F 8-5; Tu/Th 8-8pm,4.5,EXT,texas
-Wise County Animal Clinic,Decatur TX,33.2394,-97.5761,940-627-2133,M-F 7-6,4.8,DAY,texas
-Decatur Veterinary Clinic,Decatur TX,33.2164,-97.5829,940-627-2158,M-F 8-3; Sa 8-10am,4.5,DAY,texas
-VEG ER - Fort Worth Alliance (on US-287!),Fort Worth TX,32.9045,-97.3229,817-928-5995,OPEN 24/7,4.7,ER,texas
-VEG ER - Camp Bowie,Fort Worth TX,32.7279,-97.4167,325-484-4240,OPEN 24/7,4.7,ER,texas
-Fort Worth Animal Emergency Hospital,Fort Worth TX,32.6813,-97.4116,817-263-2900,OPEN 24/7,3.6,ER,texas
-MedVet Dallas,Dallas TX,32.9028,-96.77,972-994-9110,OPEN 24/7,4.1,ER,texas
-VEG ER - Dallas Central,Dallas TX,32.8204,-96.786,972-544-7311,OPEN 24/7,4.8,ER,texas
-Hillside Veterinary Clinic,Dallas TX,32.8363,-96.7591,214-824-0397,OPEN 24/7,4.3,ER,texas
-Ellis County Veterinary Clinic,Waxahachie TX,32.4015,-96.8723,972-865-7011,M/W/F/Sa/SUN 8am-8pm,4.9,EXT,texas
-CityVet Waxahachie,Waxahachie TX,32.4358,-96.8382,214-499-9959,M-F 8-6; Sa 8-12,5.0,DAY,texas
-Waxahachie Veterinary Clinic,Waxahachie TX,32.4161,-96.8235,972-923-1156,M-F 7:30-5:30; Sa 7:30-12,4.3,DAY,texas
-Ennis Veterinary Clinic,Ennis TX,32.3572,-96.6331,972-875-2647,M-F 8-6; Sa 8-10:30am,4.8,DAY,texas
-Animal Hospital of Ennis,Ennis TX,32.3452,-96.6341,972-875-4777,M-F 8-5:30,4.1,DAY,texas
-Corsicana Veterinary Clinic,Corsicana TX,32.0883,-96.4837,903-874-7226,M-F 8-6:30; Sa 9-1,4.6,EXT,texas
-Fairfield Veterinary Hospital,Fairfield TX,31.7029,-96.185,903-389-4255,M-F 8-5; Sa 9-12,4.7,DAY,texas
-Buffalo Animal Hospital,Buffalo TX,31.4618,-96.062,903-322-4239,M-F 8-5; Sa 8-12,4.6,DAY,texas
-East Lake Veterinary Hospital,Centerville TX,31.282,-95.8718,903-536-2424,DAILY 7am-7pm (7 days!),4.7,EXT,texas
-Madisonville Veterinary Hospital,Madisonville TX,30.9544,-95.9127,936-348-9618,M-F 8-5,4.8,DAY,texas
-Easterling Veterinary Services,Madisonville TX,30.9238,-95.9049,936-348-3645,M-F 8-5:30,4.6,DAY,texas
-Walker County Veterinary Center,Huntsville TX,30.7413,-95.6035,936-291-2145,M-F 8-12 & 1-5; Sa 8-12,4.8,DAY,texas
-Long Veterinary Clinic,Huntsville TX,30.7201,-95.5549,936-295-8163,M-F 7:30-5:30; Sa 9-12,4.6,DAY,texas
-Huntsville Pet Clinic,Huntsville TX,30.6987,-95.5488,936-295-8106,M-F 7:30-5; Sa 8-12,4.7,DAY,texas
-Animal Hospital & Emergency Clinic of Conroe,Conroe TX,30.3131,-95.4733,936-297-5723,OPEN 24/7 - ON I-45,4.3,ER,texas
-Emergency Pet Care of Texas,Magnolia TX,30.2214,-95.5834,832-376-3728,OPEN 24/7,4.2,ER,texas
-Greenlight Pet ER,The Woodlands TX,30.2077,-95.5281,915-400-1010,OPEN 24/7,4.6,ER,texas
-BluePearl Pet Hospital - Spring,Spring TX,30.0751,-95.4396,832-616-5000,OPEN 24/7 (I-45 N Houston approach),3.8,ER,texas
-Gulf Coast Veterinary Specialists (GCVS),Houston TX,29.7853,-95.4815,713-693-1111,OPEN 24/7 - specialty flagship,4.2,ER,texas
-Vergi 24/7,Houston TX,29.7832,-95.5069,713-932-9589,OPEN 24/7,4.0,ER,texas
-VEG ER - Houston Katy Fwy,Houston TX,29.7762,-95.3878,346-355-6444,OPEN 24/7,4.6,ER,texas
-Pearland 288 Animal Emergency (Silverlake),Pearland TX,29.555,-95.3765,713-482-4592,OPEN 24/7,3.6,ER,texas
-VCA Animal Emergency Hospital Southeast (Gulf Fwy),Houston TX,29.6434,-95.2445,713-941-8460,NIGHT: M-Th 6pm-8am; F 6pm-mid; Sa-Su 24h - ON I-45,3.4,NIGHT,texas
-Friendswood Veterinary Hospital,Friendswood TX,29.5405,-95.2012,281-993-4417,M-F 8-5,5.0,DAY,texas
-VEG ER - Friendswood (5 min from Safari),Friendswood TX,29.5453,-95.1473,281-544-0748,OPEN 24/7,4.8,ER,texas
-Friendswood Animal Clinic,Friendswood TX,29.5135,-95.189,281-482-1258,M-F 8-6; Sa 8-12,4.8,DAY,texas
-GCVS NASA Parkway,Webster TX,29.5288,-95.1324,346-788-4103,OPEN 24/7,4.2,ER,texas
-League City Animal Clinic,League City TX,29.5015,-95.1224,281-332-0644,M-Th 8-6; F 8-5,4.7,DAY,texas
-Bay Creek Animal Clinic,League City TX,29.516,-95.0846,281-332-3051,M-F 7:30-6 (W to 5),4.7,DAY,texas
-SAFARI Veterinary Care Centers (Dr. Garner) - DESTINATION,League City TX,29.5264,-95.0748,281-332-5612,M-F 6am-8pm; Sa-Su 9-6,4.5,EXT,texas
-Marina Bay Animal Hospital,League City TX,29.5428,-95.0609,281-612-5858,M-F 7:30-6; Sa 7:30-12,4.8,DAY,texas"""
+CURATED_CSV = """name,town,address,lat,lng,phone,hours,rating,typ,corridor
+Sploot Veterinary Care,Arvada,"7705 Wadsworth Blvd, Arvada CO 80003",39.8356,-105.0832,720-780-8874,DAILY 8am-8pm (Sun too),4.8,EXT,home
+Arvada Veterinary Hospital,Arvada,"6655 Wadsworth Boulevard, Arvada CO 80003",39.817,-105.0831,303-424-4439,Tu-F 8-6; M 9-5; Sa 8-4,4.6,DAY,home
+Church Ranch Veterinary Center,Westminster,"8308 Church Ranch Blvd, Broomfield CO 80021",39.8803,-105.0892,303-732-5819,"OPEN 24/7 (GP + urgent care, surgery)",4.3,ER,home
+Olde Town Veterinary Clinic,Arvada,"7709 Ralston Road, Arvada CO 80002",39.8023,-105.0835,720-328-3301,M-F 8-5,4.9,DAY,home
+UrgentVet Broomfield,Broomfield,"4700 West 121st Avenue, Broomfield CO 80020",39.9145,-105.0488,303-622-1600,M-F 3-11pm; Sa-Su 10-8,4.7,NIGHT,home
+Animal Urgent Care - W 64th Ave,Arvada,"12520 West 64th Avenue, Arvada CO 80004",39.8118,-105.1392,303-420-7387,OPEN 24/7,4.6,ER,home
+WRAH - Wheat Ridge Animal Hospital (HIS SPECIALTY HOME),Wheat Ridge,"10140 West 44th Avenue, Wheat Ridge CO 80033",39.7771,-105.111,303-424-3325,"OPEN 24/7 + specialty: neuro (Dr. Djani), IM, surgery",4.1,ER,home
+RiNoVet Animal Emergency,Denver,"4495 Washington Street, Denver CO 80216",39.778,-104.9797,303-458-5555,OPEN 24/7,4.2,ER,home
+Arvada Flats Veterinary Hospital,Arvada,"6305 Eldridge St, Arvada CO 80004",39.8111,-105.1572,303-467-9212,M-F 8-7; Sa 8-1,4.8,EXT,home
+Northside Emergency Pet Clinic,Westminster,"945 West 124th Avenue, Westminster CO 80234",39.9225,-104.9986,303-252-7722,OPEN 24/7,4.2,ER,home
+VEG ER - Edgewater,Edgewater,"5485 West 20th Avenue, Edgewater CO 80214",39.7478,-105.0565,720-996-1200,OPEN 24/7,4.8,ER,home
+VEG ER - Colfax,Denver,"3845 E Colfax Ave, Denver CO 80206",39.7404,-104.9426,720-574-9834,OPEN 24/7,4.8,ER,home
+Evolution Veterinary Specialty & Emergency,Lakewood,"34 Van Gordon St, Lakewood CO 80228",39.7154,-105.1367,720-510-7707,OPEN 24/7,4.0,ER,home
+BluePearl Pet Hospital - Lafayette,Lafayette,"2000 West South Boulder Road;W South Boulder Rd, Lafayette CO 80026",39.9874,-105.1167,720-699-7766,OPEN 24/7 specialty + ER,4.6,ER,home
+VRCC Veterinary Specialty & Emergency,Englewood,"3550 S Jason St, Englewood CO 80110",39.6524,-104.9987,303-923-5790,OPEN 24/7,4.2,ER,home
+VEG ER - Hampden,Denver,"6305 East Hampden Avenue, Denver CO 80222",39.6534,-104.9171,720-739-6003,OPEN 24/7,4.7,ER,home
+CSU Veterinary Teaching Hospital - SURGICAL HOME (Dr. Monnet),Fort Collins,"500 West Pitkin Street, Fort Collins CO 80523",40.5719,-105.085,970-297-5000,OPEN 24/7 academic,4.4,ER,home
+Animal Care Hospital of Morris,Morris IL,"221 Bedford Road, Morris IL 60450",41.3715,-88.4244,815-941-9924,M-F 8-5; Sa 8-12,4.8,DAY,flint
+Pine Bluff Animal Hospital,Morris IL,"3935 N Dresden Rd, Coal City IL 60416",41.3454,-88.2681,815-942-5365,M-F 8-5:30; Sa 8-12,4.8,DAY,flint
+Lakewood Animal Hospital,Morris IL,"1301 Lakewood Dr, Morris IL 60450",41.369,-88.4426,815-942-1199,M/Tu/Th/F 8-5:30,4.9,DAY,flint
+Parkview Animal Hospital,Newton IA,"2012 1st Avenue East, Newton IA 50208",41.6995,-93.0265,641-792-0340,M-F 8-5,4.7,DAY,flint
+Newton Animal Clinic,Newton IA,"2445 Highway F48 W, Newton IA 50208",41.6988,-93.0826,641-433-4815,M-F 8-5,4.6,DAY,flint
+Riverside Animal Hospital,Kearney NE,"1115 W 3rd St W, Kearney NE 68845",40.6759,-99.0977,308-234-2617,M-F 8-5:30; Sa 8-12,4.6,DAY,flint
+Arbor View Animal Hospital (US-6),Valparaiso IN,"261 Eagle Ridge Drive, Valparaiso IN 46385",41.5498,-87.1141,219-762-7267,M/Tu/Th 8-8pm; W/F 8-6; Sa 8-1,4.7,EXT,flint
+Valparaiso Animal Hospital,Valparaiso IN,"902 Calumet Avenue, Valparaiso IN 46383",41.4761,-87.0568,219-462-1862,M-F 7-6; Sa 8-2,4.6,DAY,flint
+McAfee Animal Hospital,Valparaiso IN,"950 Transport Drive, Valparaiso IN 46383",41.4617,-87.0175,219-462-5901,M-F 8-12 & 1:30-5:30; Sa 8-12,4.8,DAY,flint
+All Creature Features Animal Hospital,La Porte IN,"4034 South US 35, La Porte IN 46350",41.5452,-86.7017,219-393-3558,M-F 7:30-6; Sa 7-1,4.6,DAY,flint
+LaPorte Animal Hospital,La Porte IN,"2303 W State Road 2, La Porte IN 46350",41.5967,-86.7442,219-362-2612,M-W 8-5:30; F 8-5,4.5,DAY,flint
+Michigan City Animal Hospital,Michigan City IN,"2525 E MI Blvd, MI City IN 46360",41.7079,-86.868,219-872-4191,M-F 7-6; Sa 8-12; SUN 1-7pm,4.8,EXT,flint
+St Joseph Animal Wellness Clinic,St Joseph MI,"2610 N Trail Ln, Saint Joseph MI 49085",42.0723,-86.4786,269-429-6966,M-F 8-5:30 (Tu/Th to 6),4.9,DAY,flint
+Nickerson Animal Health Center,Benton Harbor MI,"2407 South M 139, Benton Harbor MI 49022",42.0747,-86.436,269-925-8835,M-F 8-6 (midday close),4.7,DAY,flint
+Sunset Coast Veterinary Clinic,St Joseph MI,"4133 M-139, St Joseph MI 49085",42.0439,-86.4348,269-408-0468,M-F ~8-5 (Tu/Th to 6),4.7,DAY,flint
+Steiner SILS Affordable Vet Care,Fort Morgan CO,"17208 US Highway 34, Fort Morgan CO 80701",40.2537,-103.8257,970-441-1503,M-Tu 7:30-5; W 7:30-4; Th-Su closed,4.6,DAY,flint
+Fort Morgan Veterinary Clinic,Fort Morgan CO,"1215 E Burlington Ave, Fort Morgan CO 80701",40.2472,-103.783,970-867-9477,M-F 8-5; Sa 9-12,4.5,DAY,flint
+Red Arrow Animal Clinic,Paw Paw MI,"38354 W Red Arrow Hwy, Paw Paw MI 49079",42.2143,-85.9213,269-657-7081,M-W/F 8-5,4.2,DAY,flint
+Paw Paw Veterinary Clinic,Paw Paw MI,"31690 Red Arrow Hwy, Paw Paw MI 49079",42.2229,-85.8597,269-657-3114,M-Th 8-7pm; F 8-5; Sa 8-1; Su 9-11am,4.8,EXT,flint
+Sterling Animal Clinic,Sterling CO,"1301 West Main Street, Sterling CO 80751",40.6247,-103.2325,970-521-0333,M-F 8-4,4.0,DAY,flint
+Veterinary Medical Clinic,Sterling CO,"211 El Camino St, Sterling CO 80751",40.6246,-103.199,970-522-3321,M-F 8-5; Sa 8-12,4.5,DAY,flint
+Town & Country Animal Hospital,Charlotte MI,"3110 South Cochran Road, Charlotte MI 48813",42.5226,-84.8365,517-543-2330,M/W 8-7pm; Tu/Th/F 8-5; Sa 8-12,4.6,EXT,flint
+Apple Grove Veterinary Care,Charlotte MI,"1800 E Clinton Trl, Charlotte MI 48813",42.5525,-84.8016,517-543-6101,M/Tu/Th 8-7pm; W/F 8-5,4.6,EXT,flint
+Baltzell Veterinary Hospital,Ogallala NE,"1710 W 4th St, Ogallala NE 69153",41.126,-101.7386,308-284-4313,M-F 8-5:30; Sa 8-12,4.8,DAY,flint
+Animal Clinic & Pharmacy,Ogallala NE,"105 W O St W, Ogallala NE 69153",41.1226,-101.7367,308-284-2182,M-F 8-5; Sa 8-12,4.7,DAY,flint
+Westfield Small Animal Clinic,North Platte NE,"1821 W A St W, North Platte NE 69101",41.1347,-100.7851,308-534-4480,M-F 8-6; Sa 8-3,4.5,DAY,flint
+Tender Hearts Veterinary Center,North Platte NE,"1208 W A St, North Platte NE 69101",41.1333,-100.7778,308-221-6915,M-F 8-5:30,4.5,DAY,flint
+America's Heartland Animal Center,North Platte NE,"220 W Fremont Dr W, North Platte NE 69101",41.0994,-100.7652,308-532-4880,M-F 7:30-5; Sa 8-12,4.4,DAY,flint
+Stockman's Veterinary Clinic,North Platte NE,"3666 N Stockman Rd, North Platte NE 69101",41.1658,-100.7583,308-532-7210,M-F 8-5:30; Sa 8-12,4.7,DAY,flint
+B & B Veterinary Services,Lexington NE,"3104 N Adams St, Lexington NE 68850",40.8064,-99.7477,308-324-3411,M-F 8-12 & 1-5; Sa 8-10am,4.8,DAY,flint
+Lexington Animal Clinic,Lexington NE,"1301 W Pacific Ave, Lexington NE 68850",40.7819,-99.7622,308-324-2411,M-F 8:30-5,4.6,DAY,flint
+Overton Veterinary Services,Overton NE,"75348 Road 440, Lexington NE 68850",40.7504,-99.6158,308-324-7202,M-F 8-5:30; Sa 8-12,4.9,DAY,flint
+Beebout Veterinary Medical Center,Kearney NE,"2907 W 37th St, Kearney NE 68845",40.7125,-99.1215,308-236-5912,M-Sa 7:30-6,4.6,DAY,flint
+West Villa Animal Hospital,Kearney NE,"2518 W 24th St, Kearney NE 68845",40.699,-99.1157,308-244-8143,M-F 7:30-6; Sa 8-12; Su 4:30-6pm,4.5,DAY,flint
+Cottonwood Veterinary Clinic,Kearney NE,"5912 2nd Avenue, Kearney NE 68847",40.7322,-99.0855,308-234-8118,M 7:30-8pm; Tu-Th 7:30-6; F 8-6,4.6,EXT,flint
+Hilltop Pet Clinic,Kearney NE,"4503 2nd Avenue, Kearney NE 68845",40.7188,-99.0825,308-236-5912,M-F 7:30-9:30a & 3:30-6p; Sa 7:30-12; Su 3-6p,4.7,DAY,flint
+Northgate Veterinary Clinic,Kearney NE,"404 East 56th Street, Kearney NE 68847",40.7288,-99.0757,308-234-9512,M-F 8-5,4.7,DAY,flint
+Parks Veterinary,Grand Island NE,"3010 N North Rd, Grand Island NE 68803",40.9557,-98.3985,308-384-6272,M-F 7:30-5; Sa 8-12,4.8,DAY,flint
+Grand Island Veterinary Hospital,Grand Island NE,"410 South Webb Road, Grand Island NE 68801",40.9139,-98.379,308-384-1641,M-F 8-5,4.5,DAY,flint
+Pet Hospital,Grand Island NE,"410 South Webb Road, Grand Island NE 68801",40.9136,-98.3787,308-384-4363,M-F 8-5; Sa 9-12,5.0,DAY,flint
+Family Pet Clinic,Grand Island NE,"2620 North Diers Avenue, Grand Island NE 68803",40.9472,-98.3857,308-384-6147,M-F 8-5,4.6,DAY,flint
+Animal Medical Clinic,Grand Island NE,"210 E Stolley Park Rd, Grand Island NE 68801",40.9026,-98.338,308-382-6330,M-F 7:30-5; Sa 8-12,4.7,DAY,flint
+South Locust Veterinary Clinic,Grand Island NE,"1616 S Locust St, Grand Island NE 68801",40.9049,-98.3404,308-382-6412,M-F 8-5:30,4.7,DAY,flint
+York Animal Clinic,York NE,"1529 N Lincoln Ave, York NE 68467",40.8755,-97.5933,402-362-2894,M-F 7:30-5:30; Sa 7:30-12,4.8,DAY,flint
+Sullivan Companion Animal Clinic,York NE,"427 North Lincoln Avenue, York NE 68467",40.8656,-97.5928,402-745-6498,M-F 8-5; Sa 8-11am,4.7,DAY,flint
+Vondra Veterinary Clinic,Lincoln NE,"2400 West Van Dorn Street, Lincoln NE 68522",40.7851,-96.7537,402-477-1113,M-F 7:30-6; Sa 8-12,4.8,DAY,flint
+Veterinary Emergency Services,Lincoln NE,"3700 S 9th St, Lincoln NE 68502",40.7762,-96.7069,402-629-6925,NIGHT ER: M-F 6pm-7am; Sa noon-mid; Su 24h,4.4,NIGHT,flint
+Nebraska Animal Medical Center,Lincoln NE,"5720 Old Cheney Road, Lincoln NE 68516",40.7545,-96.643,402-423-9100,M-F 7am-8pm; Sa-Su 8-5 (7 days!),4.3,EXT,flint
+Pitts Veterinary Hospital,Lincoln NE,"2225 NE Parkway, Lincoln NE 68502",40.7695,-96.6885,402-423-4120,M-F 7-6; Sa 9-3,4.6,DAY,flint
+Animal Care Clinic,Lincoln NE,"255 South 84th Street, Lincoln NE 68510",40.8115,-96.6065,402-566-5056,M-F 7:30-6,4.8,DAY,flint
+Clock Tower Animal Clinic,Lincoln NE,"520 North 66th Street, Lincoln NE 68505",40.8178,-96.6299,402-489-6228,M-F 7:30-6,4.8,DAY,flint
+Polaris Veterinary Center,Lincoln NE,"2062 N 112th St, Lincoln NE 68527",40.8342,-96.5666,402-467-4469,M/W 7:30-8pm; Tu/Th/F 7:30-6; Sa 7:30-1,4.7,EXT,flint
+Urgent Pet Care West,Omaha NE,"4251 South 144th Street, Omaha NE 68137",41.2169,-96.1378,402-234-8834,Daily 8am-MIDNIGHT,4.3,NIGHT,flint
+The Pet Clinic,Omaha NE,"2503 South 140th Circle, Omaha NE 68144",41.2365,-96.1339,402-330-3096,M-Th 8-7; F 8-6; Sa 8-2,4.8,DAY,flint
+VCA MidWest Referral & Emergency,Omaha NE,"9706 Mockingbird Drive, Omaha NE 68127",41.2094,-96.0652,402-513-8741,M-Th 24h; F to 6am; Sa closed; Su 4pm-mid — CALL FIRST,3.4,NIGHT,flint
+VEG ER for Pets - Omaha,Omaha NE,"3645 N 132nd St, Omaha NE 68164",41.2917,-96.1191,402-205-7271,OPEN 24/7,4.8,ER,flint
+Omaha Animal Medical Group,Omaha NE,"3316 North 120th Street, Omaha NE 68164",41.2903,-96.1014,402-496-6075,M-F 7:30-6; Sa 8-12,4.8,DAY,flint
+VCA 80 Dodge Animal Hospital,Omaha NE,"8022 West Dodge Street, Omaha NE 68114",41.2614,-96.0411,402-399-8100,M-Sa 7am-8pm; Su 10-6 (7 days),4.6,EXT,flint
+Lone Tree Animal Care Center,Omaha NE,"524 South 24th Street, Omaha NE 68105",41.255,-95.9474,402-389-3356,M 8-8p; Tu 8-5; W 12-8p; Th 8-5; F 8-4,4.8,DAY,flint
+24th Street Animal Clinic,Omaha NE,"3258 S 24th St, Omaha NE 68108",41.2284,-95.9474,402-345-2211,M-F 7:30-6,4.5,DAY,flint
+Council Bluffs Veterinary Clinic,Council Bluffs IA,"1229 S 3rd St, Council Bluffs IA 51503",41.2498,-95.8484,712-323-2147,M-F 8-5:30,4.6,DAY,flint
+Strohbehn Veterinary Clinic,Council Bluffs IA,"4040 South Expressway, Council Bluffs IA 51501",41.2201,-95.8525,712-366-0556,M-F 8-5:30; Sa 8-12,4.4,DAY,flint
+Valley View Veterinary Clinic,Council Bluffs IA,"15025 Valley View Dr, Council Bluffs IA 51503",41.2331,-95.8176,712-256-7387,M-F 8-5:30; Sa 8-12,4.7,DAY,flint
+The Animal Clinic,Council Bluffs IA,"1735 McPherson Ave, Council Bluffs IA 51503",41.2596,-95.8132,712-323-0598,M/Tu/Th/F 7-5:30; W 7-12; Sa 7-12,4.4,DAY,flint
+VEG ER for Pets - West Des Moines,West Des Moines IA,"6880 #101 E P True Parkway, Boone Township IA 50266",41.5729,-93.8012,515-259-6473,OPEN 24/7,4.9,ER,flint
+UrgentVet West Des Moines,West Des Moines IA,"5045 Bentley Drive, West Des Moines IA 50265",41.5611,-93.7719,515-215-9696,M-F 3-11pm; Sa-Su 10-8,4.7,NIGHT,flint
+Animal Doctors Veterinary Clinic,West Des Moines IA,"4800 Mills Civic Parkway, West Des Moines IA 50265",41.5581,-93.7691,515-225-9555,M-F 7-6; Sa 8-12,4.8,DAY,flint
+Animal Care Clinic West & Metro Cat,West Des Moines IA,"2900 University Avenue, West Des Moines IA 50266",41.6,-93.7443,515-224-4368,M-Th 7-7; F 7-6,4.6,EXT,flint
+Iowa Veterinary Specialties,Des Moines IA,"6110 Creston Ave, Des Moines IA 50321",41.5597,-93.7019,515-280-3100,OPEN 24/7,3.6,ER,flint
+Grand Avenue Veterinary Hospital,West Des Moines IA,"308-332 Grand Avenue, West Des Moines IA 50265",41.5824,-93.7061,515-274-3489,M-F 7:30-6,4.8,DAY,flint
+BluePearl Pet Hospital - Des Moines,Des Moines IA,"4631 Merle Hay Road, Urbandale IA 50310",41.6453,-93.697,515-727-4872,OPEN 24/7,4.3,ER,flint
+Grinnell Veterinary Clinic,Grinnell IA,"1630 West Street South, Grinnell IA 50112",41.7092,-92.7281,641-236-4461,M-F 8-5:30; Sa 8-12,4.7,DAY,flint
+All Pets Veterinary Hospital,Grinnell IA,"611 West Street, Grinnell IA 50112",41.7394,-92.7278,641-236-6869,M-W/F 8-5; Th 8-8pm; Sa 9-12,4.8,DAY,flint
+BluePearl Pet Hospital - Cedar Rapids,Cedar Rapids IA,"755 Capital Dr SW, Cedar Rapids IA 52404",41.8872,-91.6788,319-841-5161,OPEN 24/7 (25 min N of Iowa City via I-380),4.4,ER,flint
+Coralville Animal Hospital,Coralville IA,"5th Street, Coralville IA 52241",41.6764,-91.5822,319-351-6848,M-F 7:30-5:30,4.5,DAY,flint
+Goosetown Animal Hospital,Coralville IA,"311 2nd Street, Coralville IA 52241",41.6708,-91.5701,319-341-0386,M-F 8-6; Sa 8-12,5.0,DAY,flint
+Gentle Heart Pet Clinic,Iowa City IA,"1123 Shirken Dr, IA City IA 52246",41.6467,-91.5457,319-354-6696,M/Tu/F 8-5; W 8-7; Sa 8-12,4.7,DAY,flint
+Animal Clinic Inc.,Iowa City IA,"408 Highland Ave, IA City IA 52240",41.6462,-91.5296,319-337-2123,M-F 7:30-5; Sa 8-12,4.8,DAY,flint
+Emergency Veterinary Service of Iowa City,Iowa City IA,"3030 Northgate Drive, IA City IA 52245",41.6896,-91.4884,319-338-3605,DAYTIME ER: daily 8am-8pm (wknd to 6),3.2,EXT,flint
+Bright Eyes & Bushy Tails (same bldg),Iowa City IA,"3030 Northgate Drive, IA City IA 52245",41.6895,-91.4884,319-351-4256,M-F 8-8; Sa-Su 8-6 (7 days),4.3,EXT,flint
+Care Animal Center,Davenport IA,"1502 W Kimberly Rd, Davenport IA 52806",41.5604,-90.5957,563-888-1000,M/F 8-5; Tu/Th 8-6; W 8-2; Sa 8-12,4.7,DAY,flint
+Animal Family Veterinary Care,Davenport IA,"6011 N Brady St, Davenport IA 52806",41.5813,-90.5708,563-391-9522,M-F 7-6; Sa 8-2,4.7,DAY,flint
+Twin Bridges Animal Hospital,Davenport IA,"4040 E 53rd St, Davenport IA 52807",41.5758,-90.5146,563-355-5311,M-F 7:30-5:30; Sa 8-12,4.7,DAY,flint
+Animal Emergency Center Quad Cities,Bettendorf IA,"2810 State St, Bettendorf IA 52722",41.5266,-90.493,563-344-9599,NIGHT ER: M-F 5pm-8am; Sa-Su 24h,3.5,NIGHT,flint
+Glenroads Veterinary Clinic,Bettendorf IA,"3515 Middle Road, Bettendorf IA 52722",41.551,-90.483,563-332-2999,M-F 7:45-5:30,4.9,DAY,flint
+Ancare Veterinary Hospital,La Salle IL,"24th Street, La Salle IL 61301",41.3536,-89.1055,815-223-1000,M-Th 7:30-7; F -6; Sa 8-5; Su 10-3 (7 days),4.4,EXT,flint
+Animal Care Center of Shorewood,Shorewood IL,"150 Brook Forest Avenue, Shorewood IL 60404",41.5228,-88.1994,815-744-1500,M-F 7am-8pm; Sa 7-3,4.2,EXT,flint
+VCA Aurora Animal Hospital,Aurora IL,"2600 West Galena Boulevard, Sugar Grove Township IL 60506",41.7648,-88.3855,630-301-6100,OPEN 24/7,3.4,ER,flint
+Premier Paws,Joliet IL,"950 NE Frontage Rd, Joliet IL 60431",41.5394,-88.1789,815-729-1555,M 8-4; Tu-F 8-5,4.6,DAY,flint
+VCA Joliet Animal Hospital,Joliet IL,"2049 Oneida Street, Joliet IL 60435",41.5267,-88.1315,815-729-0770,M-F 7-7; Sa 8-2,4.2,EXT,flint
+Essington Road Animal Hospital,Joliet IL,"1914 Essington Rd, Joliet IL 60435",41.5561,-88.1605,815-439-2323,M/Tu/Th/F 8-12 & 1-6; W 8-12,4.7,DAY,flint
+UrgentVet Joliet,Joliet IL,"1801 West Jefferson Street, Joliet IL 60435",41.5246,-88.1251,815-846-4600,M-F 3-11pm; Sa-Su 10-8,4.7,NIGHT,flint
+Animal Medical Center of Plainfield,Plainfield IL,"13843 South IL Route 59, Plainfield IL 60544",41.6314,-88.2023,815-436-8387,OPEN 24/7,4.1,ER,flint
+VEG ER for Pets - Naperville,Naperville IL,"3204 South IL Route 59, Naperville IL 60564",41.707,-88.2051,630-503-7415,OPEN 24/7,4.7,ER,flint
+UrgentVet Naperville,Naperville IL,"602 South IL Route 59, Naperville IL 60540",41.7617,-88.2053,630-686-2400,M-F 3-11pm; Sa-Su 10-8,4.6,NIGHT,flint
+Care Animal Clinic Urgent+Wellness,Naperville IL,"531 W 87th St, Naperville IL 60565",41.7257,-88.1492,630-355-6164,M-Sa to 7-8pm; Su 9-6 (7 days),4.7,EXT,flint
+VCA Arboretum View Animal Hospital,Downers Grove IL,"2551 Warrenville Road, Downers Grove IL 60515",41.8067,-88.046,630-963-0424,OPEN 24/7,3.6,ER,flint
+VEG ER for Pets - Oak Brook,Oak Brook IL,"1765 West 22nd Street, Oak Brook IL 60523",41.8453,-87.9608,331-808-2720,OPEN 24/7,4.6,ER,flint
+Premier Veterinary Group - Orland Park,Orland Park IL,"7010 W 159th St, Orland Park IL 60462",41.6032,-87.7902,708-388-3771,OPEN 24/7,4.2,ER,flint
+Premier Veterinary Group - Chicago,Chicago IL,"3955 West Belmont Avenue, Jefferson Township IL 60641",41.9389,-87.7251,773-516-5800,OPEN 24/7,4.0,ER,flint
+MedVet Chicago,Chicago IL,"3325 North California Avenue, Jefferson Township IL 60625",41.9421,-87.6975,773-281-7110,OPEN 24/7,4.2,ER,flint
+Crossroads Animal Hospital,Crown Point IN,"1768 Wedgewood Court, Crown Point IN 46307",41.4756,-87.4072,219-319-0679,OPEN 24/7,3.5,ER,flint
+Merrillville Animal Hospital,Merrillville IN,"6226 Cleveland St, Merrillville IN 46410",41.5055,-87.3649,219-980-1531,M/Tu/Th 8-6; W 8-8pm; F-Su closed,4.3,DAY,flint
+Broadway Pet Hospital,Merrillville IN,"6690 Broadway, Merrillville IN 46410",41.4963,-87.3376,219-769-5733,M-F 8-6; Sa 8-1,4.8,DAY,flint
+EVCC Emergency Vet - Westville,Westville IN,"1645 S US Highway 421, Westville IN 46391",41.581,-86.8926,219-785-7300,OPEN 24/7,4.7,ER,flint
+Family Pet Health Center,South Bend IN,"2910 E Mishawaka Aven, South Bend IN 46615",41.6655,-86.2064,574-282-2303,M-F 8-5,4.8,DAY,flint
+EVCC Emergency Vet (South Bend metro),Mishawaka IN,"5718 N Main St, Mishawaka IN 46545",41.7133,-86.1779,574-544-6200,OPEN 24/7,4.4,ER,flint
+Mishawaka Animal Care Center,Mishawaka IN,"129 W Edison Rd, Mishawaka IN 46545",41.6946,-86.1832,574-255-4130,M/Th/F 8-5:30; Tu 8-6; W 8-12,4.7,DAY,flint
+Animal Care Clinic North,Elkhart IN,"327 Northpointe Boulevard, Elkhart IN 46514",41.734,-85.9791,574-264-9521,M-F 7:30-5,4.8,DAY,flint
+Animal Aid Clinic South,Elkhart IN,"3718 E Mishawaka Rd, Elkhart IN 46517",41.6391,-85.9312,574-875-5102,M-F 8-6; Sa 8-1,4.5,DAY,flint
+Noah's Landing Pet Care Clinic,Elkhart IN,"3929 E Jackson Blvd, Elkhart IN 46516",41.6932,-85.9147,574-293-4555,M-F 8-6; Sa 8-1,4.6,DAY,flint
+Pokagon Veterinary Hospital,Angola IN,"2650 W Maumee St, Angola IN 46703",41.6379,-85.0381,260-665-6023,M-Th 8-6; Sa 8-12,4.8,DAY,flint
+All Paws & Claws Veterinary Clinic,Angola IN,"2005 N Wayne St, Angola IN 46703",41.6593,-85.0022,260-665-5612,M/W 9-5; Tu/Th 9-8pm; F/Sa 9-12,4.8,EXT,flint
+Beechwood Veterinary Clinic,Angola IN,"200 Growth Pkwy, Angola IN 46703",41.6664,-85.0015,260-665-2090,M-F 8-5,4.4,DAY,flint
+NIVES 24h Emergency & Specialty,Fort Wayne IN,"5818 Maplecrest Road, Fort Wayne IN 46835",41.134,-85.0613,260-426-1062,OPEN 24/7 (40 min S of I-69 jct),4.3,ER,flint
+Care Center Hospital for Animals,Coldwater MI,"649 East Chicago Road, Coldwater MI 49036",41.9372,-84.9514,517-278-5631,M-F 8-5; Sa 8-12,4.5,DAY,flint
+Tekonsha Animal Hospital (on I-69),Tekonsha MI,"828 N Main St, Tekonsha MI 49092",42.0995,-84.9855,517-767-3011,M/Tu/F 8-5:30; W 8-7pm; Th 8-5; Sa 8-12,4.7,DAY,flint
+VCA Specialty & Emergency Kalamazoo,Portage MI,"5348 S Westnedge Ave, Portage MI 49002",42.2394,-85.5912,269-381-5228,OPEN 24/7,3.4,ER,flint
+Southside Veterinary Clinic,Battle Creek MI,"5900 Capital Ave SW, Battle Creek MI 49015",42.218,-85.2038,269-979-1588,M-F 9-5; Sa 9-12,4.8,DAY,flint
+Kalamazoo Animal Hospital,Kalamazoo MI,"3301 South Burdick Street, Kalamazoo MI 49001",42.259,-85.5794,269-381-1570,M-Th 8-6; F 8-5,4.5,DAY,flint
+Sprinkle Road Veterinary Clinic,Kalamazoo MI,"2659 S Sprinkle Rd, Kalamazoo MI 49001",42.2642,-85.5303,269-349-6060,M-W 7-6; Th/F 8-6; Sa 8-1,4.7,DAY,flint
+EVCC Kalamazoo West Main,Kalamazoo MI,"6211 West Main Street, Kalamazoo MI 49009",42.2952,-85.6731,269-548-0400,24h wknds + some weekdays; closed Wed - CALL,4.8,NIGHT,flint
+Dickman Road Veterinary Clinic,Battle Creek MI,"455 W Dickman Rd, Battle Creek MI 49037",42.3196,-85.199,269-963-9347,M-F 7:30-6; Sa 8-12,4.4,DAY,flint
+DRVC On Columbia,Battle Creek MI,"680 West Columbia Avenue, Battle Creek MI 49015",42.2988,-85.2123,269-441-3013,M-F 8-12 & 1-6,4.6,DAY,flint
+VCA Marshall Animal Hospital,Marshall MI,"713 Brewer St, Marshall MI 49068",42.2837,-84.9651,269-781-5114,M-F 7:30-6,4.6,DAY,flint
+Brooklyn Road Veterinary Clinic,Jackson MI,"6551 Brooklyn Rd, Jackson MI 49201",42.1723,-84.2741,517-758-2729,M-Tu/Th-F 9-5; W 9-8pm; Sa 9-12,4.9,DAY,flint
+Miller Animal Clinic,Lansing MI,"6515 W Saginaw Hwy, Lansing MI 48917",42.7403,-84.6444,517-321-6406,M-F 8am-8pm; Sa 9-5,4.5,EXT,flint
+Waverly Animal Hospital,Lansing MI,"233 S Waverly Rd, Lansing MI 48917",42.7319,-84.6021,517-323-4156,M-F 7am-8pm; Sa 8-4,4.3,EXT,flint
+Jolly Road Veterinary Hospital,Lansing MI,"3276 E Jolly Rd, Lansing MI 48910",42.6826,-84.5092,517-977-1095,M/Tu/Th 8-5:30; W 10-7; F 8-5,4.6,DAY,flint
+Evergreen Veterinary Clinic,Lansing MI,"1114 E Mount Hope Ave, Lansing MI 48910",42.7117,-84.5363,517-507-0053,M-W/F 8-5; Th 12-8pm,4.9,DAY,flint
+MSU Veterinary Medical Center,Lansing MI,"824 Wilson Rd, East Lansing MI 48824",42.7228,-84.4708,517-353-5420,OPEN 24/7 - academic hospital ON I-69,3.6,ER,flint
+Greater Lansing Veterinary Center,Williamston MI,"1290 W Grand River Ave, Williamston MI 48895",42.6896,-84.3049,517-708-2525,"OPEN 24/7 (E of Lansing, Flint approach)",3.5,ER,flint
+Emergency Veterinary Hospital - Ann Arbor,Ann Arbor MI,"5245 Jackson Road, Ann Arbor MI 48103",42.2869,-83.834,734-369-6446,OPEN 24/7 (45 min S of Flint),3.8,ER,flint
+Animal Emergency Center - Novi,Novi MI,"24400 Novi Road, Novi MI 48375",42.4687,-83.4743,248-348-1788,OPEN 24/7,3.8,ER,flint
+MedVet Commerce (Flint SE backup),Commerce Twp MI,"1120 Welch Rd, Commerce Township MI 48390",42.544,-83.4576,248-960-7200,OPEN 24/7,4.3,ER,flint
+Cross Veterinary Clinic,Grand Blanc MI,"5490 Ali Dr, Grand Blanc MI 48439",42.9447,-83.678,810-406-1494,M/Tu 9-6; W-F 9-5,4.8,DAY,flint
+Animal Emergency Hospital,Burton MI (Flint),"1148 E Bristol Rd, Burton MI 48529",42.9739,-83.6872,810-238-7557,Daily 8am-MIDNIGHT (W/Th from noon),3.7,NIGHT,flint
+Grand Blanc Veterinary Hospital,Grand Blanc MI,"6137 S Saginaw Rd, Grand Blanc MI 48439",42.942,-83.6469,810-694-8241,M-F 8:30-5; Sa 8:30-12,4.5,DAY,flint
+Briarwood Veterinary Hospital,Grand Blanc MI,"8213 South Saginaw Road, Grand Blanc MI 48439",42.9126,-83.6083,810-695-6055,M/Th 8-6; Tu/W/F 8-5:30; Sa 8-12,4.8,DAY,flint
+UrgentVet Parker,Parker CO,"12239 Pine Bluffs Way, Parker CO 80134",39.4934,-104.7585,720-835-1500,M-F 3-11pm; Sa-Su 10-8,4.6,NIGHT,texas
+Animal Care Center of Castle Pines,Castle Rock CO,"562 East Castle Pines Parkway, Castle Pines CO 80108",39.47,-104.8743,303-688-3660,M-Th 7-7; F/Sa 7-6,4.8,EXT,texas
+Cherished Companions Animal Clinic,Castle Rock CO,"281 Metzler Dr, Castle Rock CO 80108",39.4096,-104.8594,303-688-3757,M-F 8-6,4.7,DAY,texas
+Veterinary Specialists of the Rockies,Castle Rock CO,"774 Maleta Lane, Castle Rock CO 80108",39.4071,-104.8543,303-660-1027,OPEN 24/7 specialty + ER,3.9,ER,texas
+North Springs Veterinary Referral Center,Colorado Springs CO,"10520 White Diamond Point, CO Springs CO 80908",38.9838,-104.7958,719-920-4430,OPEN 24/7,4.4,ER,texas
+Animal ER Care,Colorado Springs CO,"5520 N Nevada Ave, CO Springs CO 80918",38.9082,-104.8184,719-260-7141,OPEN 24/7,4.2,ER,texas
+Southern Rockies Animal Emergency + Specialty,Colorado Springs CO,"5886 Tutt Blvd, CO Springs CO 80923",38.9161,-104.7179,719-473-0482,OPEN 24/7,3.6,ER,texas
+Pueblo Animal Urgent Care,Pueblo CO,"704 West Fortino Boulevard, Pueblo CO 81008",38.3114,-104.6175,719-544-7788,NIGHT: M-F 4pm-midnight; Sa-Su noon-midnight,3.1,NIGHT,texas
+Pueblo Small Animal Clinic,Pueblo CO,"1400 E 20th St, Pueblo CO 81001",38.2857,-104.5868,719-545-4350,M/Tu/Th/F 8-12 & 1-5:30,4.2,DAY,texas
+Veterinary Hospital Associates,Pueblo CO,"651 S Pueblo Blvd, Pueblo CO 81005",38.2547,-104.6621,719-564-0330,M-F 8-5:30,4.5,DAY,texas
+Mesa Veterinary Clinic,Pueblo CO,"20th Lane, Blende CO 81006",38.2445,-104.5654,719-542-6075,M-F 7:30-5:30; Sa 7:30-12,4.5,DAY,texas
+Trinidad Animal Clinic,Trinidad CO,"1701 East Main Street, Trinidad CO 81082",37.1769,-104.4891,719-846-3212,M-F 8-12 & 1-4; Sa 8:30-12,4.7,DAY,texas
+Fisher's Peak Vet Clinic,Trinidad CO,"1605 Santa Fe Trail, Trinidad CO 81082",37.1564,-104.5121,719-846-3211,M-F 8-5; Sa 8-12,4.6,DAY,texas
+Mesa Vista Veterinary Hospital,Raton NM,"1600 S 2nd St, Raton NM 87740",36.87,-104.4408,575-445-3912,M-F 8-12 & 1-5,4.8,DAY,texas
+Raton Veterinary Hospital,Raton NM,"1101 Frontage Road, Raton NM 87740",36.8864,-104.4291,575-445-2691,M-W/F 8-5; Sa 8-11am,4.8,DAY,texas
+Clayton Veterinarian Clinic,Clayton NM,"1406 South 1st Street, Clayton NM 88415",36.4386,-103.1755,575-374-2332,M-F 8-12 & 1-5; Sa 8-12,4.9,DAY,texas
+Twist Junction Veterinary Services,Dalhart TX,"12035 FM 3139, Dalhart TX 79022",36.0419,-102.55,806-244-0110,M-F 8-12 & 1-5,4.8,DAY,texas
+Circle H Animal Health,Dalhart TX,"3212 US 54 (TX), Dallam TX 79022",36.0777,-102.5014,806-244-7851,M-F 8-5,4.8,DAY,texas
+Dumas Veterinary Services,Dumas TX,"324 South Bliss Avenue, Dumas TX 79029",35.8624,-101.9723,806-922-6298,Tu/Th 8:30-5; Sa 8-12 only,5.0,DAY,texas
+Animal Medical Center,Amarillo TX,"6201 West Amarillo Boulevard, Amarillo TX 79106",35.1999,-101.9081,806-358-7831,M-F 7:30-6; Sa 8-2; Su 8-1 (7 days),4.8,EXT,texas
+Small Animal Emergency Clinic,Amarillo TX,"5127 Canyon Drive, Amarillo TX 79110",35.156,-101.8776,806-352-2277,NIGHT ER: M-Th 6:30pm-7:30am; F 6:30pm-mid; Sa-Su 24h,3.9,NIGHT,texas
+Swann Animal Clinic at 45th,Amarillo TX,"3102 Southwest 45th Avenue, Amarillo TX 79109",35.1643,-101.874,806-355-9443,M-F 7am-8:30pm; Sa 8-5,4.7,EXT,texas
+Urgent Care at Swann,Amarillo TX,"3102 Southwest 45th Avenue, Amarillo TX 79109",35.1642,-101.8738,806-355-9445,M-W/F 7am-8:30pm; Sa 8-5,4.1,EXT,texas
+Amarillo Vet Clinic,Amarillo TX,"941 S Marrs St, Amarillo TX 79104",35.1999,-101.802,806-373-7454,M-F 9-5:30,4.1,DAY,texas
+Clarendon Veterinary Hospital,Clarendon TX,"1121 E 2nd St, Clarendon TX 79226",34.9332,-100.8767,806-874-3544,M-F 8-5,4.4,DAY,texas
+Childress Veterinary Hospital,Childress TX,"109 Industrial Cir, Childress TX 79201",34.442,-100.2396,940-937-2558,M-F 8-12 & 1:30-5,4.4,DAY,texas
+Critter Care Vet Clinic,Childress TX,"300 US Highway 83 North, Childress TX 79201",34.4328,-100.2259,940-937-6065,M-Th 9-12 & 1-5; F 9-12,4.0,DAY,texas
+Main St Veterinary Clinic,Vernon TX,"3402 Main St, Vernon TX 76384",34.1375,-99.2843,940-553-3791,M-F 8:30-5:30,4.6,DAY,texas
+Lacy Veterinary Clinic,Vernon TX,"219 US Highway 287 E, Vernon TX 76384",34.156,-99.2634,940-552-7755,M-F 8-12 & 1-5,4.5,DAY,texas
+PETS Clinic (nonprofit),Wichita Falls TX,"3001 Central Freeway, Wichita Falls TX 76306",33.9548,-98.5266,940-723-7387,M-Th 8:30-5,4.8,DAY,texas
+Salt Creek Vet Urgent Care,Wichita Falls TX,"2927 Southwest Parkway, Wichita Falls TX 76308",33.8574,-98.5399,940-247-7207,LIMITED: M 7-7; W 5-8pm; Sa 1-5 - CALL FIRST,4.3,EXT,texas
+Animal Hospital of Wichita Falls,Wichita Falls TX,"3206 Holliday Rd, Wichita Falls TX 76302",33.8807,-98.4945,940-767-4369,M-W/F 8-5:30; Th 8-12,4.7,DAY,texas
+Chisholm Trail Pet Clinic,Bowie TX,"904 Highway 81 N, Bowie TX 76230",33.5663,-97.8573,940-872-8900,M-Th 8-5:30,4.8,DAY,texas
+Bowie Pet Clinic,Bowie TX,"100 North Smythe Street, Bowie TX 76230",33.5588,-97.8505,940-872-3400,M/W/F 9-4; Tu/Th 9-6,4.6,DAY,texas
+Cross Timbers Veterinary Hospital,Bowie TX,"1403 Highway 59 N, Bowie TX 76230",33.5671,-97.8373,940-872-2161,M-F 8-5:30; Sa 8-12,4.7,DAY,texas
+Pet Health Center (US-287),Decatur TX,"1879 North US Highway 287, Decatur TX 76234",33.2578,-97.611,940-627-8387,M/W/F 8-5; Tu/Th 8-8pm,4.5,EXT,texas
+Wise County Animal Clinic,Decatur TX,"1000 E Business 380, Decatur TX 76234",33.2394,-97.5761,940-627-2133,M-F 7-6,4.8,DAY,texas
+Decatur Veterinary Clinic,Decatur TX,"2101 S College Ave, Decatur TX 76234",33.2164,-97.5829,940-627-2158,M-F 8-3; Sa 8-10am,4.5,DAY,texas
+VEG ER - Fort Worth Alliance (on US-287!),Fort Worth TX,"9001 Tehama Ridge Pkwy, Fort Worth TX 76177",32.9045,-97.3229,817-928-5995,OPEN 24/7,4.7,ER,texas
+VEG ER - Camp Bowie,Fort Worth TX,"6201 Camp Bowie Blvd, Fort Worth TX 76116",32.7279,-97.4167,325-484-4240,OPEN 24/7,4.7,ER,texas
+Fort Worth Animal Emergency Hospital,Fort Worth TX,"4631 Citylake Blvd W, Fort Worth TX 76132",32.6813,-97.4116,817-263-2900,OPEN 24/7,3.6,ER,texas
+MedVet Dallas,Dallas TX,"11343 North Central Expressway, Dallas TX 75243",32.9028,-96.77,972-994-9110,OPEN 24/7,4.1,ER,texas
+VEG ER - Dallas Central,Dallas TX,"4500 North Central Expressway, Dallas TX 75205",32.8204,-96.786,972-544-7311,OPEN 24/7,4.8,ER,texas
+Hillside Veterinary Clinic,Dallas TX,"6150 East Mockingbird Lane, Dallas TX 75205",32.8363,-96.7591,214-824-0397,OPEN 24/7,4.3,ER,texas
+Ellis County Veterinary Clinic,Waxahachie TX,"793 South Interstate 35, Waxahachie TX 75165",32.4015,-96.8723,972-865-7011,M/W/F/Sa/SUN 8am-8pm,4.9,EXT,texas
+CityVet Waxahachie,Waxahachie TX,"1975 North US Highway 77, Waxahachie TX 75165",32.4358,-96.8382,214-499-9959,M-F 8-6; Sa 8-12,5.0,DAY,texas
+Waxahachie Veterinary Clinic,Waxahachie TX,"2300 Brown Street, Waxahachie TX 75165",32.4161,-96.8235,972-923-1156,M-F 7:30-5:30; Sa 7:30-12,4.3,DAY,texas
+Ennis Veterinary Clinic,Ennis TX,"3101 North Kaufman Street, Ennis TX 75119",32.3572,-96.6331,972-875-2647,M-F 8-6; Sa 8-10:30am,4.8,DAY,texas
+Animal Hospital of Ennis,Ennis TX,"2001 North Kaufman Street, Ennis TX 75119",32.3452,-96.6341,972-875-4777,M-F 8-5:30,4.1,DAY,texas
+Corsicana Veterinary Clinic,Corsicana TX,"1701 West 2nd Avenue, Corsicana TX 75151",32.0883,-96.4837,903-874-7226,M-F 8-6:30; Sa 9-1,4.6,EXT,texas
+Fairfield Veterinary Hospital,Fairfield TX,"1320 US - 84, Fairfield TX 75840",31.7029,-96.185,903-389-4255,M-F 8-5; Sa 9-12,4.7,DAY,texas
+Buffalo Animal Hospital,Buffalo TX,"511 E US Highway 79, Buffalo TX 75831",31.4618,-96.062,903-322-4239,M-F 8-5; Sa 8-12,4.6,DAY,texas
+East Lake Veterinary Hospital,Centerville TX,,31.282,-95.8718,903-536-2424,DAILY 7am-7pm (7 days!),4.7,EXT,texas
+Madisonville Veterinary Hospital,Madisonville TX,"409 E Collard St, Madisonville TX 77864",30.9544,-95.9127,936-348-9618,M-F 8-5,4.8,DAY,texas
+Easterling Veterinary Services,Madisonville TX,"2233 Highway 90, Madisonville TX 77864",30.9238,-95.9049,936-348-3645,M-F 8-5:30,4.6,DAY,texas
+Walker County Veterinary Center,Huntsville TX,"1039 State Highway 75 N, Huntsville TX 77320",30.7413,-95.6035,936-291-2145,M-F 8-12 & 1-5; Sa 8-12,4.8,DAY,texas
+Long Veterinary Clinic,Huntsville TX,"1411 14th St, Huntsville TX 77340",30.7201,-95.5549,936-295-8163,M-F 7:30-5:30; Sa 9-12,4.6,DAY,texas
+Huntsville Pet Clinic,Huntsville TX,"2902 Montgomery Rd, Huntsville TX 77340",30.6987,-95.5488,936-295-8106,M-F 7:30-5; Sa 8-12,4.7,DAY,texas
+Animal Hospital & Emergency Clinic of Conroe,Conroe TX,"505 Interstate 45 North, Conroe TX 77304",30.3131,-95.4733,936-297-5723,OPEN 24/7 - ON I-45,4.3,ER,texas
+Emergency Pet Care of Texas,Magnolia TX,"7850 FM 1488 Rd, Magnolia TX 77354",30.2214,-95.5834,832-376-3728,OPEN 24/7,4.2,ER,texas
+Greenlight Pet ER,The Woodlands TX,"7901 Research Forest Dr, Spring TX 77382",30.2077,-95.5281,915-400-1010,OPEN 24/7,4.6,ER,texas
+BluePearl Pet Hospital - Spring,Spring TX,"1646 Spring Cypress Road, Spring TX 77388",30.0751,-95.4396,832-616-5000,OPEN 24/7 (I-45 N Houston approach),3.8,ER,texas
+Gulf Coast Veterinary Specialists (GCVS),Houston TX,"8042 Katy Freeway, Houston TX 77055",29.7853,-95.4815,713-693-1111,OPEN 24/7 - specialty flagship,4.2,ER,texas
+Vergi 24/7,Houston TX,"8819 Katy Freeway, Houston TX 77024",29.7832,-95.5069,713-932-9589,OPEN 24/7,4.0,ER,texas
+VEG ER - Houston Katy Fwy,Houston TX,"2785 Katy Fwy, Houston TX 77007",29.7762,-95.3878,346-355-6444,OPEN 24/7,4.6,ER,texas
+Pearland 288 Animal Emergency (Silverlake),Pearland TX,"10034 West Broadway Street, Pearland TX 77584",29.555,-95.3765,713-482-4592,OPEN 24/7,3.6,ER,texas
+VCA Animal Emergency Hospital Southeast (Gulf Fwy),Houston TX,"10331 Gulf Fwy, Houston TX 77034",29.6434,-95.2445,713-941-8460,NIGHT: M-Th 6pm-8am; F 6pm-mid; Sa-Su 24h - ON I-45,3.4,NIGHT,texas
+Friendswood Veterinary Hospital,Friendswood TX,"111 Woodland Trail Dr, Friendswood TX 77546",29.5405,-95.2012,281-993-4417,M-F 8-5,5.0,DAY,texas
+VEG ER - Friendswood (5 min from Safari),Friendswood TX,"18980 Gulf Fwy, Friendswood TX 77546",29.5453,-95.1473,281-544-0748,OPEN 24/7,4.8,ER,texas
+Friendswood Animal Clinic,Friendswood TX,"1401 South Friendswood Drive, Friendswood TX 77546",29.5135,-95.189,281-482-1258,M-F 8-6; Sa 8-12,4.8,DAY,texas
+GCVS NASA Parkway,Webster TX,"20610 Gulf Fwy, Webster TX 77598",29.5288,-95.1324,346-788-4103,OPEN 24/7,4.2,ER,texas
+League City Animal Clinic,League City TX,"2204 West Main Street, League City TX 77573",29.5015,-95.1224,281-332-0644,M-Th 8-6; F 8-5,4.7,DAY,texas
+Bay Creek Animal Clinic,League City TX,"1236 E Main St, League City TX 77573",29.516,-95.0846,281-332-3051,M-F 7:30-6 (W to 5),4.7,DAY,texas
+SAFARI Veterinary Care Centers (Dr. Garner) - DESTINATION,League City TX,"2402 Marina Bay Dr, League City TX 77573",29.5264,-95.0748,281-332-5612,M-F 6am-8pm; Sa-Su 9-6,4.5,EXT,texas
+Marina Bay Animal Hospital,League City TX,"3030 Marina Bay Dr, League City TX 77573",29.5428,-95.0609,281-612-5858,M-F 7:30-6; Sa 7:30-12,4.8,DAY,texas"""
 
 
 def load_curated():
@@ -684,6 +693,9 @@ def load_curated():
     df["source"] = "curated"
     df["hours_raw"] = df["hours"]
     df["website"] = ""; df["maps_url"] = ""
+    if "address" not in df: df["address"] = ""
+    df["address"] = df["address"].fillna("")
+    df["sched"] = [sched_compact(parse_hours_loose(h)) if t != "ER" else [[[0, 1440]]] * 7 for h, t in zip(df["hours"], df["typ"])]
     df["er_hint"] = df["typ"].isin(["ER", "NIGHT"])
     return df
 
@@ -770,7 +782,9 @@ def fetch_osm(boxes):
         if t.get("emergency") == "yes" and typ in ("UNK", "DAY"):
             hours += " (OSM tag emergency=yes)"
         city = t.get("addr:city") or ""
-        rows.append({"name": name, "lat": float(lat), "lng": float(lng),
+        street = " ".join(x for x in (t.get("addr:housenumber"), t.get("addr:street")) if x)
+        address = ", ".join(x for x in (street, " ".join(y for y in (city, t.get("addr:state"), t.get("addr:postcode")) if y)) if x)
+        rows.append({"name": name, "lat": float(lat), "lng": float(lng), "address": address, "sched": sched_compact(sched),
                      "phone": _fmt_phone(t.get("phone") or t.get("contact:phone")),
                      "hours": hours, "hours_raw": hours_raw, "typ": typ, "rating": "",
                      "town": (city + (f" {t['addr:state']}" if city and t.get("addr:state") else "")).strip(),
@@ -833,7 +847,8 @@ def _google_row(pl):
     addr = pl.get("formattedAddress", "")
     m = re.search(r",\s*([^,]+?),\s*([A-Z]{2})\s*\d{5}", addr)
     town = f"{m.group(1)} {m.group(2)}" if m else addr
-    return {"name": name, "lat": pl["location"]["latitude"], "lng": pl["location"]["longitude"],
+    return {"name": name, "lat": pl["location"]["latitude"], "lng": pl["location"]["longitude"], "address": addr.replace(", USA", ""),
+            "sched": sched_compact(sched),
             "phone": _fmt_phone(pl.get("nationalPhoneNumber")), "hours": hours, "hours_raw": hours_raw, "typ": typ,
             "rating": (f"{pl['rating']:.1f}" if pl.get("rating") is not None else ""), "town": town,
             "website": pl.get("websiteUri", ""), "maps_url": pl.get("googleMapsUri", ""), "source": "Google",
@@ -907,10 +922,10 @@ def _refresh_from_google(dup, r):
         dup["typ"] = "UNK"
     elif r.get("typ") != "UNK":
         dup["hours"] = r["hours"] + (f" · {note}" if note else "")
-        dup["typ"] = r["typ"]; dup["hours_raw"] = r.get("hours_raw", "")
+        dup["typ"] = r["typ"]; dup["hours_raw"] = r.get("hours_raw", ""); dup["sched"] = r.get("sched")
     else:
         return                                                  # Google has no hours: the hand-verified text stands
-    for c in ("rating", "phone", "website", "maps_url"):
+    for c in ("rating", "phone", "website", "maps_url", "address"):
         if r.get(c): dup[c] = r[c]
     dup["source"] = "curated+Google"
 
@@ -933,19 +948,21 @@ def merge_sources(*frames):
             if dup is not None:
                 if r.get("source") == "Google" and str(dup.get("source", "")).startswith("curated"):
                     _refresh_from_google(dup, r)
-                for c in ("maps_url", "website", "rating", "phone"):
+                for c in ("maps_url", "website", "rating", "phone", "address"):
                     if not dup.get(c) and r.get(c): dup[c] = r[c]
                 continue
             if r.get("closed"):
                 continue                                        # a closed listing with no hand-verified twin: not a door
             kept.append(dict(r)); klat.append(r["lat"]); klng.append(r["lng"]); knorm.append(_norm(r["name"]))
-    cols = ["name", "town", "lat", "lng", "phone", "hours", "hours_raw", "typ", "rating", "website", "maps_url", "source", "er_hint"]
+    cols = ["name", "town", "address", "lat", "lng", "phone", "hours", "hours_raw", "typ", "rating", "website", "maps_url", "source", "er_hint", "sched"]
     out = pd.DataFrame(kept)
     for c in cols:
-        if c not in out: out[c] = "" if c != "er_hint" else False
+        if c not in out: out[c] = "" if c not in ("er_hint", "sched") else (False if c == "er_hint" else None)
     out["er_hint"] = out["er_hint"].fillna(False).astype(bool)
     out = out.drop(columns=["closed"], errors="ignore")
-    return out[cols + [c for c in out.columns if c not in cols]].fillna("")
+    out = out[cols + [c for c in out.columns if c not in cols]]
+    sched = out["sched"]; out = out.fillna(""); out["sched"] = [s if isinstance(s, list) else None for s in sched]
+    return out
 
 
 def coverage_gaps(df, total_mi, types=("ER", "NIGHT"), reach_mi=45, min_gap_mi=100):
@@ -1036,7 +1053,7 @@ DATA.forEach((c,i)=>{
  const cur=c.source.indexOf('curated')===0;
  const m=L.circleMarker([c.lat,c.lng],{radius:c.typ==='ER'?9:6,color:cur?'#ffffff':'#0e1116',weight:cur?2:1.5,fillColor:col[c.typ],fillOpacity:.95}).addTo(map);
  const gm=c.maps_url||('https://maps.google.com/?q='+c.lat+','+c.lng);
- m.bindPopup('<div class="pop"><b>'+c.name+'</b><br>'+c.town+' &middot; ~mi '+c.mile+' &middot; '+c.off+' mi off route<br><span class="t-'+c.typ+'">'+c.hours+'</span><br>&#9733; '+(c.rating||'&ndash;')+' &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><a target="_blank" href="'+gm+'">Open in Google Maps</a>'+(c.website?' &middot; <a target="_blank" href="'+c.website+'">website</a>':'')+'<br><span class="src">source: '+c.source+'</span></div>');
+ m.bindPopup('<div class="pop"><b>'+c.name+'</b><br>'+(c.address||c.town)+' &middot; ~mi '+c.mile+' &middot; '+c.off+' mi off route<br><span class="t-'+c.typ+'">'+c.hours+'</span><br>&#9733; '+(c.rating||'&ndash;')+' &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><a target="_blank" href="https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng+'">Directions</a> &middot; <a target="_blank" href="'+gm+'">Open in Google Maps</a>'+(c.website?' &middot; <a target="_blank" href="'+c.website+'">website</a>':'')+'<br><span class="src">source: '+c.source+'</span></div>');
  markers[i]=m;
 });
 }catch(err){document.getElementById('map').innerHTML='<div class="note" style="padding:24px 16px">The map picture needs internet the first time it is opened. Everything below still works: filters, search, tap-to-call and Near me.</div>';}
@@ -1061,7 +1078,7 @@ function render(){
  rows.sort((a,b)=>{let x=a[sortK],y=b[sortK];if(typeof x==='string'){x=x.toLowerCase();y=y.toLowerCase()}return (x<y?-1:x>y?1:0)*(sortA?1:-1)});
  rows.forEach(c=>{
   const tr=document.createElement('tr');
-  tr.innerHTML='<td>'+c.mile+'</td><td class="here" style="display:'+(HERE?'':'none')+'">'+(c.here!=null?c.here.toFixed(1)+' mi':'')+'</td><td>'+c.town+'</td><td>'+c.name+'</td><td class="t-'+c.typ+'">'+c.typ+'</td><td>'+c.off+' mi</td><td>'+c.hours+'</td><td>'+(c.rating||'&ndash;')+'</td><td>'+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'&ndash;')+'</td><td class="src">'+c.source+'</td>';
+  tr.innerHTML='<td>'+c.mile+'</td><td class="here" style="display:'+(HERE?'':'none')+'">'+(c.here!=null?c.here.toFixed(1)+' mi':'')+'</td><td>'+c.town+'</td><td>'+c.name+(c.address?'<br><span class="src">'+c.address+'</span>':'')+'</td><td class="t-'+c.typ+'">'+c.typ+'</td><td>'+c.off+' mi</td><td>'+c.hours+'</td><td>'+(c.rating||'&ndash;')+'</td><td>'+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'&ndash;')+'</td><td class="src">'+c.source+'</td>';
   tr.onclick=()=>{if(map&&markers[c.i]){map.setView([c.lat,c.lng],12);markers[c.i].openPopup();window.scrollTo({top:0,behavior:'smooth'})}};
   tb.appendChild(tr);});
  if(map) DATA.forEach((c,i)=>{const s=(F==='ALL'||c.typ===F)&&(!Q||(c.town+' '+c.name).toLowerCase().includes(Q));
@@ -1088,11 +1105,12 @@ def _thin(route, n=200):
 
 def render_html(df, *, title, sub, note_top, note_bottom, route=None, variant=None, home=None, rings=(5, 15), mode="corridor"):
     """Fills the Leaflet template with the clinic table, route line(s) and notes -> one self-contained HTML string."""
-    cols = ["name", "town", "lat", "lng", "phone", "hours", "typ", "rating", "off", "mile", "source", "website", "maps_url"]
+    cols = ["name", "town", "address", "lat", "lng", "phone", "hours", "typ", "rating", "off", "mile", "source", "website", "maps_url", "sched"]
     recs = []
     for _, r in df.iterrows():
         rec = {c: r.get(c, "") for c in cols}
-        for c in ("name", "town", "hours", "phone", "rating", "source"): rec[c] = _esc(rec[c])
+        rec["sched"] = rec["sched"] if isinstance(rec["sched"], list) else None
+        for c in ("name", "town", "address", "hours", "phone", "rating", "source"): rec[c] = _esc(rec[c] if rec[c] is not None else "")
         rec["lat"] = round(float(rec["lat"]), 4); rec["lng"] = round(float(rec["lng"]), 4)
         rec["off"] = float(rec["off"]); rec["mile"] = int(rec["mile"]) if mode != "home" else float(rec["mile"])
         recs.append(rec)
@@ -1272,17 +1290,47 @@ def _fetch_bytes(url):
     return r.content
 
 
-def _icon_png(size):
-    """A paw print on a red tile - the home-screen icon."""
+def _icon_png(size, maskable=False):
+    """The icon: a red map pin with a white paw standing on a small night-mode street map (major roads, a grid of
+    side streets, a park) on a dark tile.  maskable=True draws everything smaller so Android's circle/squircle masks
+    never clip it.  Drawn at 1024 px and downsampled so edges stay smooth."""
     import io
     from PIL import Image, ImageDraw
-    im = Image.new("RGBA", (size, size), "#151a22"); d = ImageDraw.Draw(im)
-    pad = size * 0.10
-    d.rounded_rectangle([pad, pad, size - pad, size - pad], radius=size * 0.2, fill="#ff5252")
-    cx, cy = size / 2, size * 0.60
-    d.ellipse([cx - size * 0.17, cy - size * 0.13, cx + size * 0.17, cy + size * 0.15], fill="white")
-    for (dx, dy, r) in [(-0.24, -0.20, 0.075), (-0.09, -0.30, 0.08), (0.09, -0.30, 0.08), (0.24, -0.20, 0.075)]:
-        d.ellipse([cx + dx * size - r * size, cy + dy * size - r * size, cx + dx * size + r * size, cy + dy * size + r * size], fill="white")
+    S = 1024
+    k = 0.78 if maskable else 1.0
+    P = lambda x, y: (S * (0.5 + (x - 0.5) * k), S * (0.5 + (y - 0.5) * k))        # scale a point toward the centre
+    W = lambda w: max(2, int(S * w * k))
+    im = Image.new("RGBA", (S, S), "#0e1116")
+    # --- the map, drawn on its own layer and clipped to a rounded plate ---
+    mp = Image.new("RGBA", (S, S), (0, 0, 0, 0)); m = ImageDraw.Draw(mp)
+    x0, y0 = P(0.08, 0.54); x1, y1 = P(0.92, 0.93)
+    m.rounded_rectangle([x0, y0, x1, y1], radius=int(S * 0.08 * k), fill="#1b2433")
+    m.polygon([P(0.60, 0.60), P(0.78, 0.57), P(0.90, 0.66), P(0.84, 0.80), P(0.66, 0.78)], fill="#17373f")       # park
+    m.polygon([P(0.08, 0.84), P(0.20, 0.82), P(0.26, 0.93), P(0.08, 0.93)], fill="#17373f")                       # park
+    minor, major = "#39475c", "#7d8ca6"
+    for i in range(1, 15):                                                             # side-street grid
+        x = 0.08 + i * 0.06; m.line([P(x, 0.54), P(x + 0.015, 0.93)], fill=minor, width=W(0.007))
+    for j in range(1, 7):
+        y = 0.54 + j * 0.056; m.line([P(0.08, y), P(0.92, y - 0.012)], fill=minor, width=W(0.007))
+    m.line([P(0.30, 0.54), P(0.30, 0.93)], fill=major, width=W(0.020))                                            # avenue
+    m.line([P(0.08, 0.705), P(0.92, 0.705)], fill=major, width=W(0.020))                                           # boulevard
+    m.line([P(0.56, 0.54), P(0.60, 0.64), P(0.70, 0.70), P(0.86, 0.72), P(0.92, 0.80)], fill=major, width=W(0.017), joint="curve")  # parkway
+    m.line([P(0.62, 0.93), P(0.70, 0.86), P(0.84, 0.86), P(0.92, 0.90)], fill="#5a6a84", width=W(0.011), joint="curve")
+    im.alpha_composite(mp)
+    d = ImageDraw.Draw(im)
+    # --- the pin ---
+    cx, cy = P(0.5, 0.40); R = S * 0.24 * k; tip = P(0.5, 0.80)[1]
+    d.ellipse([cx - S * 0.14 * k, tip - S * 0.045 * k, cx + S * 0.14 * k, tip + S * 0.045 * k], fill="#0b0e13")  # ground shadow
+    d.ellipse([cx - R, cy - R, cx + R, cy + R], fill="#ff5252")
+    d.polygon([(cx - R * 0.72, cy + R * 0.69), (cx + R * 0.72, cy + R * 0.69), (cx, tip)], fill="#ff5252")
+    pr, py = R * 0.52, cy + R * 0.02
+    d.ellipse([cx - pr * 0.62, py - pr * 0.08, cx + pr * 0.62, py + pr * 0.78], fill="white")
+    for dx, dy, rr in [(-0.80, -0.42, 0.26), (-0.32, -0.78, 0.28), (0.32, -0.78, 0.28), (0.80, -0.42, 0.26)]:
+        d.ellipse([cx + dx * pr - rr * pr, py + dy * pr - rr * pr, cx + dx * pr + rr * pr, py + dy * pr + rr * pr], fill="white")
+    if not maskable:
+        mask = Image.new("L", (S, S), 0); ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.22), fill=255)
+        im.putalpha(mask)
+    im = im.resize((size, size), Image.LANCZOS)
     buf = io.BytesIO(); im.save(buf, "PNG"); return buf.getvalue()
 
 
@@ -1300,7 +1348,19 @@ def _leaflet_files():
 
 # A map page built by the notebook or the Streamlit builder loads Leaflet from a CDN; inside the phone app the same
 # page is pointed at the app's own copy so it works with no signal.  The same rewrite runs in the browser on import.
-_LOCALIZE_JS = r"""function localizeMap(t){return t.replace(/<link rel="stylesheet" href="[^"]*leaflet[^"]*\.css"\/?>/,'<link rel="stylesheet" href="./leaflet.css">').replace(/<script src="[^"]*leaflet[^"]*\.js"><\/script>/,'<script src="./leaflet.js"><\/script><script src="./leaflet-icons.js"><\/script>')}"""
+_PWA_MYMAPS_JS = r"""// Shared by index.html and live.html: maps a person saves live in this app's own storage, on this phone only.
+function localizeMap(t){return t.replace(/<link rel="stylesheet" href="[^"]*leaflet[^"]*\.css"\/?>/,'<link rel="stylesheet" href="./leaflet.css">').replace(/<script src="[^"]*leaflet[^"]*\.js"><\/script>/,'<script src="./leaflet.js"><\/script><script src="./leaflet-icons.js"><\/script>')}
+const mmIdx=()=>{try{return JSON.parse(localStorage.getItem('mymaps')||'[]')}catch(e){return []}};
+const mmSave=l=>localStorage.setItem('mymaps',JSON.stringify(l));
+async function saveMapHtml(t,fallbackName){
+ if(t.indexOf('const DATA=')<0)throw new Error('not a map from the builder');
+ t=localizeMap(t);const id=(Date.now().toString(36)+Math.random().toString(36).slice(2,7));
+ const c=await caches.open('mymaps');await c.put(new Request('./map-'+id+'.html'),new Response(t,{headers:{'Content-Type':'text/html; charset=utf-8'}}));
+ const ti=(t.match(/<title>(.*?)<\/title>/)||[])[1]||fallbackName||'Map',su=(t.match(/<div class="sub">(.*?)<\/div>/)||[])[1]||'';
+ const l=mmIdx();l.push({id,title:ti,sub:su.replace(/<[^>]+>/g,'').slice(0,120)});mmSave(l);return id;}
+async function removeMap(id){const c=await caches.open('mymaps');await c.delete('./map-'+id+'.html');mmSave(mmIdx().filter(m=>m.id!==id));}
+function listenForMaps(onSaved){window.addEventListener('message',async e=>{const d=e.data;if(!d||d.type!=='vetmap'||typeof d.html!=='string')return;
+ if(APP_ORIGIN&&e.origin!==APP_ORIGIN)return;try{const id=await saveMapHtml(d.html,d.name);onSaved&&onSaved(id,mmIdx().slice(-1)[0]);}catch(err){alert('Could not save that map: '+err.message);}});}"""
 
 
 def _localize_map(page):
@@ -1326,8 +1386,7 @@ h2{font-size:14px;color:#9aa3b2;font-weight:600;margin:18px 0 6px}
 .card{display:block;background:#1a212c;border:1px solid #2a3140;border-radius:12px;padding:12px 14px;margin:8px 0;color:#e8eaee;text-decoration:none;position:relative}
 .card b{display:block;font-size:15px;color:#fff;padding-right:60px}.card span{color:#9aa3b2;font-size:12.5px}
 .card .rm{position:absolute;right:12px;top:12px;color:#9aa3b2;font-size:12px;background:none;border:1px solid #3a4356;border-radius:8px;padding:4px 8px;cursor:pointer}
-#near{display:none;background:#1a212c;border:1px solid #ffab2e;border-radius:12px;padding:12px 14px;margin:8px 0;font-size:14px;line-height:1.5}
-#near a{color:#8fc1ff;text-decoration:none;font-weight:700}
+#near{margin:4px 0}
 .t-ER{color:#ff6b6b;font-weight:700}.t-NIGHT{color:#ffb84d;font-weight:700}
 .status{font-size:12.5px;color:#9aa3b2;padding:10px 0 0;line-height:1.5}.status b{color:#7fe0a0}.status i{color:#ffb84d;font-style:normal}
 .status a,.sub a{color:#8fc1ff;text-decoration:none}
@@ -1336,26 +1395,40 @@ body.offline .off{display:block}body.offline .btn.blue{opacity:.45;pointer-event
 .empty{color:#9aa3b2;font-size:13px;line-height:1.5;padding:4px 0}
 table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:#ffd94d;padding:8px 6px;border-bottom:2px solid #2a3140;position:sticky;top:0;background:#1a212c}
 td{padding:7px 6px;border-bottom:1px solid #232a36;vertical-align:top}td a{color:#8fc1ff;text-decoration:none}
+.seg{display:flex;gap:6px;margin:6px 0 8px}.seg button{flex:1;background:#1a212c;border:1px solid #3a4356;color:#c9ceda;border-radius:10px;padding:9px 4px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.seg button.on{background:#2f6fd6;border-color:#2f6fd6;color:#fff}
+.res{background:#1a212c;border:1px solid #2a3140;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13.5px;line-height:1.45}
+.res b{color:#fff;font-size:15px}.res .d{color:#ffd94d;font-weight:700;white-space:nowrap}.res .addr{color:#c9ceda}.res .hrs{color:#9aa3b2;font-size:12.5px}
+.acts{display:flex;gap:8px;margin-top:8px}.act{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#242c3a;border:1px solid #3a4356;color:#fff;border-radius:10px;padding:9px 6px;text-decoration:none;font-weight:700;font-size:13.5px}
+.act.go{background:#2f6fd6;border-color:#2f6fd6}.act.call{background:#1f7a4d;border-color:#1f7a4d}.act svg{width:16px;height:16px;flex:0 0 auto}
+.badge{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;background:#2a3140;color:#c9ceda}.badge.ER{background:#5a2222;color:#ff8a8a}.badge.NIGHT{background:#5a3f14;color:#ffc46b}.badge.EXT{background:#5a5214;color:#ffe97a}.badge.DAY{background:#1b3a5a;color:#8fc1ff}
+#nearmap{display:none;height:240px;border-radius:12px;margin:8px 0;border:1px solid #2a3140;background:#1a212c}
+.small{font-size:13px;padding:10px}.note{color:#9aa3b2;font-size:12.5px;line-height:1.5}
+.toast{position:fixed;left:16px;right:16px;bottom:20px;background:#1b3324;border:1px solid #3fbf74;color:#b9f0cf;border-radius:12px;padding:12px 14px;font-size:14px;z-index:9999}.toast a{color:#fff;font-weight:700}
+td .go{display:inline-block;background:#2f6fd6;color:#fff;border-radius:7px;padding:3px 7px;font-size:12px;text-decoration:none}
 </style>"""
 
-_PWA_INDEX = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__</title>__HEAD__</head><body>
+_PWA_INDEX = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__</title>__HEAD__<link rel="stylesheet" href="./leaflet.css"></head><body>
 <header><img src="./icon-192.png" alt=""><div><h1>__TITLE__</h1><div class="sub">__SUB__</div></div></header>
 <main>
-<div class="off">No signal - the live builder needs internet. Your saved maps, the verified list and Near me still work.</div>
-<button class="btn" id="nearbtn">&#9673; Nearest overnight doors to me now</button>
+<div class="off">No signal - building a new map needs internet. Clinics near me, the built-in list and your saved maps still work.</div>
+<h2>Veterinary clinics near me</h2>
+<div class="seg" id="mode"><button data-m="er" class="on">24/7 ER</button><button data-m="late">Late night</button><button data-m="open">Open now</button></div>
+<button class="btn" id="nearbtn">&#9673; Find clinics near me</button>
 <div id="near"></div>
+<div id="nearmap"></div>
 __LIVE__
-<h2>My maps - saved on this phone only</h2>
-<div id="mymaps"></div>
-<div class="empty" id="mmhelp">Build a map in the live builder, tap <b>Save the map</b> there, then add the saved file here. It stays on this phone; nobody else can see it.</div>
-<label class="btn grey" for="addmap">+ Add a saved map file</label><input id="addmap" type="file" accept=".html,text/html" style="display:none">
 __BUILTIN__
 <div id="sponsor"></div>
+<div id="mmsec" style="display:none"><h2>My maps</h2><div id="mymaps"></div></div>
+<div class="status" id="st">Works without signal: clinics near me, the built-in list and your saved maps. Needs signal: building a new map, directions, and map pictures the first time you look at an area. <a href="./install.html" id="howto">Put it on your home screen</a> &middot; <a href="./privacy.html">Privacy</a></div>
 <button class="btn grey" id="installbtn" style="display:none">&#11015; Install this app on your phone</button>
-<div class="status" id="st"><a href="./install.html" id="howto"><b style="color:#8fc1ff">Put it on your home screen</b></a> so it opens like an app and works without signal. Map tiles need internet the first time; clinic tables, tap-to-call and Near me never do. <a href="./privacy.html">Privacy</a></div>
+<h2>Add a map file</h2>
+<label class="btn grey small" for="addmap">+ Add a map file</label><input id="addmap" type="file" accept=".html,text/html" style="display:none">
+<div class="note">Maps you build inside this app save to it with one tap. This is for a map file someone sent you or one you built on a computer. Maps stay on this phone only; nobody else can see them.</div>
 </main>
+<script src="./leaflet.js"></script><script src="./leaflet-icons.js"></script><script>const APP_ORIGIN=__APP_ORIGIN__;</script><script src="./mymaps.js"></script>
 <script>
-__LOCALIZE__
 function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}
 window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').then(()=>{document.getElementById('st').insertAdjacentHTML('afterbegin','<b>Saved on this phone.</b> ')}).catch(()=>{});}
@@ -1363,60 +1436,72 @@ let deferredInstall=null;const ib=document.getElementById('installbtn');
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;ib.style.display='';});
 ib.onclick=async()=>{if(!deferredInstall)return;ib.disabled=true;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;ib.style.display='none';};
 window.addEventListener('appinstalled',()=>{ib.style.display='none';});
-if(window.matchMedia('(display-mode: standalone)').matches||navigator.standalone){document.getElementById('st').insertAdjacentHTML('afterbegin','<b>Installed.</b> ');document.getElementById('howto').style.display='none';}
+if(window.matchMedia('(display-mode: standalone)').matches||navigator.standalone){document.getElementById('howto').style.display='none';}
 fetch('./sponsor.json',{cache:'no-store'}).then(r=>r.json()).then(sp=>{if(sp&&sp.enabled&&sp.url){document.getElementById('sponsor').innerHTML='<a class="card" href="'+sp.url+'" target="_blank" rel="noopener sponsored" style="border-color:#3a4356"><b>'+sp.title+'</b><span>'+(sp.text||'')+'</span><span style="display:block;font-size:11px;margin-top:4px;color:#6f7886">Sponsored</span></a>';}}).catch(()=>{});
 function hav(a,b,c,d){const r=Math.PI/180,R=3958.76;const x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
-const idx=()=>{try{return JSON.parse(localStorage.getItem('mymaps')||'[]')}catch(e){return []}};
-const saveIdx=l=>localStorage.setItem('mymaps',JSON.stringify(l));
-function renderMine(){const l=idx(),box=document.getElementById('mymaps');box.innerHTML=l.map(m=>'<a class="card" href="./map-'+m.id+'.html"><b>'+m.title+'</b><span>'+m.sub+'</span><button class="rm" data-id="'+m.id+'">remove</button></a>').join('');
- document.getElementById('mmhelp').style.display=l.length?'none':'';
- box.querySelectorAll('.rm').forEach(b=>b.onclick=async e=>{e.preventDefault();const id=b.dataset.id;const c=await caches.open('mymaps');await c.delete('./map-'+id+'.html');saveIdx(idx().filter(m=>m.id!==id));renderMine();});}
-document.getElementById('addmap').onchange=async e=>{const f=e.target.files[0];if(!f)return;let t=await f.text();
- if(t.indexOf('const DATA=')<0){alert('That is not a map saved from the map builder.');return;}
- t=localizeMap(t);const id=(Date.now().toString(36)+Math.random().toString(36).slice(2,7));
- const c=await caches.open('mymaps');await c.put(new Request('./map-'+id+'.html'),new Response(t,{headers:{'Content-Type':'text/html; charset=utf-8'}}));
- const ti=(t.match(/<title>(.*?)<\/title>/)||[])[1]||f.name,su=(t.match(/<div class="sub">(.*?)<\/div>/)||[])[1]||'';
- const l=idx();l.push({id,title:ti,sub:su.replace(/<[^>]+>/g,'').slice(0,120)});saveIdx(l);renderMine();e.target.value='';};
-renderMine();
+function renderMine(){const l=mmIdx(),box=document.getElementById('mymaps');box.innerHTML=l.map(m=>'<a class="card" href="./map-'+m.id+'.html"><b>'+m.title+'</b><span>'+m.sub+'</span><button class="rm" data-id="'+m.id+'">remove</button></a>').join('');
+ document.getElementById('mmsec').style.display=l.length?'':'none';
+ box.querySelectorAll('.rm').forEach(b=>b.onclick=async e=>{e.preventDefault();await removeMap(b.dataset.id);renderMine();});}
+document.getElementById('addmap').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await saveMapHtml(await f.text(),f.name);renderMine();window.scrollTo({top:document.getElementById('mmsec').offsetTop-10,behavior:'smooth'});}catch(err){alert('That is not a map saved from the map builder.');}e.target.value='';};
+renderMine();listenForMaps(()=>renderMine());
 async function allClinics(){const seen={},out=[];const add=c=>{const k=c.name+'|'+(+c.lat).toFixed(3);if(!seen[k]){seen[k]=1;out.push(c);}};
  try{const b=await (await fetch('./builtin.json')).json();b.forEach(c=>{c.source='verified';add(c)});}catch(e){}
- try{const c=await caches.open('mymaps');for(const m of idx()){const r=await c.match('./map-'+m.id+'.html');if(!r)continue;const t=await r.text();const mm=t.match(/const DATA=(\[[\s\S]*?\]); const MAIN=/);if(mm)JSON.parse(mm[1]).forEach(add);}}catch(e){}
+ try{const c=await caches.open('mymaps');for(const m of mmIdx()){const r=await c.match('./map-'+m.id+'.html');if(!r)continue;const t=await r.text();const mm=t.match(/const DATA=(\[[\s\S]*?\]); const MAIN=/);if(mm)JSON.parse(mm[1]).forEach(add);}}catch(e){}
  return out;}
+function openNow(c,now){if(c.typ==='ER')return true;const s=c.sched;if(!s)return null;const d=(now.getDay()+6)%7,m=now.getHours()*60+now.getMinutes();
+ for(const iv of (s[d]||[]))if(iv[0]<=m&&m<iv[1])return true;for(const iv of (s[(d+6)%7]||[]))if(iv[1]>1440&&m<iv[1]-1440)return true;return false;}
+const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function dirUrl(c){return IOS?'https://maps.apple.com/?daddr='+c.lat+','+c.lng+'&q='+encodeURIComponent(c.name):'https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng;}
+const ICO_GO='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3 3 10.5l8 2.5 2.5 8L21 3z"/></svg>',ICO_CALL='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.6a1 1 0 0 1-.25 1L6.6 10.8z"/></svg>';
+let mode='er',nearMap=null,nearLayer=null,lastPos=null;
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));if(lastPos)showNear(lastPos);});
+function row(c){const typ=c.typ||'UNK';const badge={ER:'24/7 ER',NIGHT:'late night',EXT:'extended hrs',DAY:'daytime',UNK:'hours unknown'}[typ]||typ;
+ return '<div class="res"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>'+c.name+'</b><span class="badge '+typ+'">'+badge+'</span></div><span class="d">'+c.d.toFixed(1)+' mi</span></div>'
+ +'<div class="addr">'+(c.address||c.town||'')+'</div><div class="hrs">'+(c.hours||'')+'</div>'
+ +'<div class="acts">'+(c.phone?'<a class="act call" href="tel:'+c.phone+'">'+ICO_CALL+' Call</a>':'<span class="act" style="opacity:.5">no phone listed</span>')+'<a class="act go" target="_blank" rel="noopener" href="'+dirUrl(c)+'">'+ICO_GO+' Directions</a></div></div>';}
+async function showNear(p){lastPos=p;const la=p.coords.latitude,lo=p.coords.longitude;const all=await allClinics();const now=new Date();
+ all.forEach(c=>{c.d=hav(la,lo,c.lat,c.lng)});
+ let pick=mode==='er'?all.filter(c=>c.typ==='ER'):mode==='late'?all.filter(c=>c.typ==='ER'||c.typ==='NIGHT'):all.filter(c=>openNow(c,now)===true);
+ pick.sort((a,b)=>a.d-b.d);const top=pick.slice(0,6);const box=document.getElementById('near');
+ const label={er:'24/7 emergency hospitals',late:'24/7 and late-night clinics',open:'clinics open right now'}[mode];
+ box.innerHTML=(top.length?'<div style="color:#ffd94d;font-weight:700;margin:6px 0 2px">Nearest '+label+'</div>'+top.map(row).join(''):'<div class="res">No '+label+' in the built-in list or your saved maps near here. Try another option above, or build a map of your area.</div>')
+  +'<div class="note" style="margin-top:6px">Straight-line miles. '+(mode==='open'?'Clinics whose hours are not listed are left out of Open now. ':'')+'Always call before driving - hours change.</div>';
+ try{const mapEl=document.getElementById('nearmap');mapEl.style.display='block';
+  if(!nearMap){nearMap=L.map('nearmap',{zoomControl:false,attributionControl:false});L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(nearMap);}
+  if(nearLayer)nearLayer.remove();nearLayer=L.layerGroup().addTo(nearMap);const col={ER:'#ff5252',NIGHT:'#ffab2e',EXT:'#ffe14d',DAY:'#4d9bff',UNK:'#9aa3b2'};
+  L.circleMarker([la,lo],{radius:7,color:'#fff',fillColor:'#2f6fd6',fillOpacity:1,weight:2}).addTo(nearLayer).bindPopup('You are here');
+  top.forEach(c=>L.circleMarker([c.lat,c.lng],{radius:8,color:'#fff',weight:1.5,fillColor:col[c.typ]||col.UNK,fillOpacity:1}).addTo(nearLayer).bindPopup('<b>'+c.name+'</b><br>'+(c.address||c.town||'')+'<br>'+c.d.toFixed(1)+' mi &middot; <a href="'+dirUrl(c)+'" target="_blank">Directions</a>'));
+  const pts=[[la,lo]].concat(top.map(c=>[c.lat,c.lng]));nearMap.fitBounds(L.latLngBounds(pts).pad(0.2));setTimeout(()=>nearMap.invalidateSize(),50);
+ }catch(e){}
+}
 document.getElementById('nearbtn').onclick=()=>{
- const box=document.getElementById('near');box.style.display='block';box.innerHTML='Getting your location...';
- if(!navigator.geolocation){box.innerHTML='This browser cannot give a location.';return;}
- navigator.geolocation.getCurrentPosition(async p=>{
-  const la=p.coords.latitude,lo=p.coords.longitude;const all=await allClinics();
-  all.forEach(c=>c.d=hav(la,lo,c.lat,c.lng));
-  const over=all.filter(c=>c.typ==='ER'||c.typ==='NIGHT').sort((a,b)=>a.d-b.d).slice(0,4);
-  const any=all.filter(c=>c.typ!=='ER'&&c.typ!=='NIGHT').sort((a,b)=>a.d-b.d).slice(0,3);
-  const row=c=>'<div><b>'+c.name+'</b> <span class="t-'+c.typ+'">'+c.typ+'</span> &middot; '+c.d.toFixed(1)+' mi straight-line &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><span style="color:#9aa3b2;font-size:12.5px">'+(c.town||'')+' &middot; '+c.hours+'</span></div>';
-  const hr='<hr style="border:0;border-top:1px solid #2a3140;margin:6px 0">';
-  box.innerHTML=(over.length?'<div style="color:#ffd94d;font-weight:700;margin-bottom:4px">Overnight doors nearest you</div>'+over.map(row).join(hr):'<div>No 24/7 or night clinic known near here. Add a map of your area for better coverage.</div>')
-   +(any.length?'<div style="color:#ffd94d;font-weight:700;margin:10px 0 4px">Nearest daytime clinics</div>'+any.map(row).join(hr):'')
-   +'<div style="color:#9aa3b2;font-size:12px;margin-top:8px">From '+all.length+' clinics: the built-in verified list plus your saved maps. Call before driving - hours change.</div>';
- },()=>{box.innerHTML='Location unavailable - allow location access for this app and try again.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+ const box=document.getElementById('near');box.innerHTML='<div class="res">Getting your location...</div>';
+ if(!navigator.geolocation){box.innerHTML='<div class="res">This browser cannot give a location.</div>';return;}
+ navigator.geolocation.getCurrentPosition(showNear,()=>{box.innerHTML='<div class="res">Location unavailable - allow location access for this app and try again.</div>'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
 };
 </script></body></html>"""
 
-_PWA_LIVE = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - live builder</title>__HEAD__
+_PWA_LIVE = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - map builder</title>__HEAD__
 <style>html,body{height:100%}body{display:flex;flex-direction:column}iframe{flex:1 1 auto;border:0;width:100%}
-.bar{padding:8px 16px;background:#151a22;border-bottom:1px solid #2a3140;font-size:13px}.bar a{color:#8fc1ff;text-decoration:none}</style></head>
-<body><div class="bar"><a href="./index.html">&larr; My maps &amp; Near me</a> &nbsp;&middot;&nbsp; <a href="__APP__" target="_blank">open in browser</a></div>
-<div class="off" style="margin:8px 16px">No signal - the live builder needs internet. <a href="./index.html" style="color:#ffd94d">Use your saved maps</a>.</div>
+.bar{padding:8px 16px;background:#151a22;border-bottom:1px solid #2a3140;font-size:13px;line-height:1.5}.bar a{color:#8fc1ff;text-decoration:none}.bar .n{color:#9aa3b2}</style></head>
+<body><div class="bar"><a href="./index.html">&larr; Home</a> &nbsp;&middot;&nbsp; <a href="__APP__" target="_blank">open in browser</a> <span class="n">&nbsp;&middot;&nbsp; If it says the app is asleep, tap <b>Yes, get this app back up</b> and give it 30 seconds.</span></div>
+<div class="off" style="margin:8px 16px">No signal - the builder needs internet. <a href="./index.html" style="color:#ffd94d">Use clinics near me or your saved maps</a>.</div>
 <iframe src="__APP__?embed=true" allow="geolocation; clipboard-write" title="Map builder"></iframe>
-<script>function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();</script>
+<script>const APP_ORIGIN=__APP_ORIGIN__;</script><script src="./mymaps.js"></script>
+<script>function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();
+listenForMaps((id,m)=>{const t=document.createElement('div');t.className='toast';t.innerHTML='Saved: <b>'+(m?m.title:'map')+'</b> is under My maps on the <a href="./index.html">home page</a>.';document.body.appendChild(t);setTimeout(()=>t.remove(),8000);});</script>
 </body></html>"""
 
-_PWA_VERIFIED = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - verified overnight clinics</title>__HEAD__</head>
-<body><header><div><h1>Verified 24/7 and night clinics</h1><div class="sub"><a href="./index.html">&larr; back</a> &middot; __N__ clinics checked by hand against their listings (__STAMP__). Call before driving - hours change.</div></div></header>
-<main><table><thead><tr><th>Town</th><th>Clinic</th><th>Hours</th><th>Call</th></tr></thead><tbody>__ROWS__</tbody></table></main></body></html>"""
+_PWA_VERIFIED = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - hand-verified clinics</title>__HEAD__</head>
+<body><header><div><h1>Hand-verified clinics</h1><div class="sub"><a href="./index.html">&larr; back</a> &middot; __N__ clinics checked by hand against their listings (__STAMP__); __NER__ open 24/7 or late. Call before driving - hours change.</div></div></header>
+<main><table><thead><tr><th>Town</th><th>Clinic</th><th>Hours</th><th></th></tr></thead><tbody>__ROWS__</tbody></table></main>
+<script>const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);if(IOS)document.querySelectorAll('a[data-ll]').forEach(a=>{a.href='https://maps.apple.com/?daddr='+a.dataset.ll;});</script></body></html>"""
 
 _PWA_PRIVACY = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - privacy</title>__HEAD__</head>
 <body><header><div><h1>Privacy</h1><div class="sub"><a href="./index.html">&larr; back</a></div></div></header>
 <main style="font-size:14px;line-height:1.6">
 <p><b>__TITLE__</b> does not collect, store or transmit personal information, and has no accounts.</p>
-<p><b>Location.</b> When you tap "Nearest overnight doors to me now" or "Near me", the app asks the phone for its position and uses it on the phone to sort clinics by distance. The position is not sent anywhere and is not kept.</p>
+<p><b>Location.</b> When you tap "Find clinics near me" or "Near me", the app asks the phone for its position and uses it on the phone to sort clinics by distance. The position is not sent anywhere and is not kept. Tapping "Directions" opens your phone's own maps app with the clinic's location.</p>
 <p><b>Saved maps.</b> Maps you add are stored in this app's own storage on your phone. They are not uploaded. Removing the app removes them.</p>
 <p><b>Third-party services.</b> Map background tiles are requested from Esri and the U.S. Geological Survey when you look at a map with internet access; those requests carry the map area being viewed. The live builder (__APPHOST__) is a separate web page: addresses you type there are sent to routing and geocoding services (OSRM, U.S. Census Bureau, ArcGIS, Photon, OpenStreetMap) and, when configured, Google Places, to produce the map. It stores nothing about you beyond temporary caching needed to build the map.</p>
 <p><b>Clinic information</b> comes from public listings and is provided as a convenience; always call ahead. Nothing here is veterinary advice.</p>
@@ -1459,15 +1544,15 @@ section{display:none}section.on{display:block}
 .after{background:#1a212c;border:1px solid #2a3140;border-radius:16px;padding:6px 16px 10px;margin:18px 0 10px}
 .help{color:#9aa3b2;font-size:13.5px;line-height:1.5;margin:14px 0}.help a{color:#8fc1ff;text-decoration:none}
 </style></head><body>
-<header><img src="./icon-192.png" alt=""><div><h1>Get __TITLE__ on your phone</h1><div class="sub">Free &middot; about 30 seconds &middot; no app store needed</div></div></header>
+<header><img src="./icon-192.png" alt=""><div><h1>Get __TITLE__ on your phone</h1><div class="sub">__SLOGAN__ &middot; free &middot; about 30 seconds</div></div></header>
 <main>
 <div class="hero">
 <h2>Not your regular mobile app <em>(good to know)</em></h2>
 <p><b>__TITLE__</b> is a web app. Instead of downloading it from a store, you <u>save it to your home screen from Safari or Chrome</u>.</p>
-<p>It takes a fraction of the space of a normal app, updates itself, and once it is on your home screen, <b>Nearest overnight doors</b>, your saved maps and tap-to-call all work with no signal at all.</p>
+<p>It takes a fraction of the space of a normal app, updates itself, and once it is on your home screen, <b>clinics near me</b>, your saved maps and tap-to-call all work with no signal at all.</p>
 <div class="warn" id="inapp" hidden></div>
 <button class="btn" id="installbtn" hidden>&#11015; Install __TITLE__ now (one tap)</button>
-<div class="ok" id="done" hidden><b>Installed.</b> Close this and open <b>__TITLE__</b> from your home screen. The first time, tap <b>Nearest overnight doors to me now</b> and allow location.</div>
+<div class="ok" id="done" hidden><b>You're all set - __TITLE__ is installed.</b> Open it from your home screen. The first time, tap <b>Find clinics near me</b> and allow location.</div>
 </div>
 <div class="desk" id="desk" hidden>Open this page on your phone:<br><code id="here"></code>__QR__<br><span style="color:#9aa3b2;font-size:13px">Scan with the phone's camera, or text yourself the link.</span></div>
 <div class="tabs"><button data-p="ios">iPhone / iPad</button><button data-p="android">Android (Chrome)</button><button data-p="samsung">Samsung Internet</button></div>
@@ -1475,7 +1560,7 @@ section{display:none}section.on{display:block}
 <section id="p-ios">
 <div class="step"><div class="n">1</div><div><p>Open this page in <b>Safari</b> and tap the <b>share button</b> at the bottom of the screen.</p>
 <small>From Instagram, Facebook or Messages, the page may open inside that app: tap &bull;&bull;&bull; in the corner and choose <b>Open in Safari</b> first.</small>
-<div class="phone"><div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Nearest overnight doors to me now</div><div class="al"></div><div class="al" style="width:55%"></div></div>
+<div class="phone"><div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Find clinics near me</div><div class="al"></div><div class="al" style="width:55%"></div></div>
 <div class="bar"><span class="ic" style="font-size:12px">AA</span><div class="url">&#128274; __HOST__</div><span class="ic">&#8635;</span></div>
 <div class="bar bottom"><span class="ic">&lsaquo;</span><span class="ic">&rsaquo;</span><span class="ic hl"><svg width="18" height="21" viewBox="0 0 18 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 13V1.5M5 5l4-4 4 4M5 8.5H3v11h12v-11h-2"/></svg></span><span class="ic">&#9783;</span><span class="ic">&#10697;</span></div>
 <div class="tip">&uarr; the square with the arrow</div></div></div></div>
@@ -1489,7 +1574,7 @@ section{display:none}section.on{display:block}
 <div class="step"><div class="n">1</div><div><p>Open this page in <b>Chrome</b> and tap the <b>three dots</b> in the top corner.</p>
 <small>From Instagram, Facebook or Messenger, the page opens inside that app and the option is missing: tap &#8942; and choose <b>Open in Chrome</b> (or Open in browser) first.</small>
 <div class="phone"><div class="bar"><span class="ic">&#8962;</span><div class="url">&#128274; __HOST__</div><span class="ic">+</span><span class="ic" style="font-size:11px;border:1.5px solid #c9ceda;width:16px;height:16px;border-radius:4px">3</span><span class="ic hl">&#8942;</span></div>
-<div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Nearest overnight doors to me now</div><div class="al"></div><div class="al" style="width:55%"></div></div>
+<div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Find clinics near me</div><div class="al"></div><div class="al" style="width:55%"></div></div>
 <div class="tip">&uarr; the three dots, top right</div></div></div></div>
 <div class="step"><div class="n">2</div><div><p>Tap <b>Add to Home screen</b> (on some phones it says <b>Install app</b>).</p>
 <div class="phone"><div class="menu"><div><span>&#8862;</span>New tab</div><div><span>&#9673;</span>New Incognito tab</div><div><span>&#9719;</span>History</div><div><span>&#10697;</span>Recent tabs</div><div><span>&#8615;</span>Downloads</div><div><span>&#9734;</span>Bookmarks</div><div><span>&#8679;</span>Share...</div><div><span>&#9906;</span>Find in page</div><div class="hl"><span>&#8853;</span>Add to Home screen</div><div><span>&#9645;</span>Desktop site</div><div><span>&#9881;</span>Settings</div></div></div></div></div>
@@ -1500,7 +1585,7 @@ section{display:none}section.on{display:block}
 <section id="p-samsung">
 <div class="step"><div class="n">1</div><div><p>Open this page in <b>Samsung Internet</b> and tap the <b>menu</b> (three lines, bottom right).</p>
 <small>If a small download-style icon appears at the right end of the address bar, that is an <b>Install</b> shortcut - tapping it does the whole thing.</small>
-<div class="phone"><div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Nearest overnight doors to me now</div><div class="al"></div><div class="al" style="width:55%"></div></div>
+<div class="phone"><div class="app"><div class="ah"><img src="./icon-192.png" alt=""><b>__TITLE__</b></div><div class="ab">&#9673; Find clinics near me</div><div class="al"></div><div class="al" style="width:55%"></div></div>
 <div class="bar"><div class="url">&#128274; __HOST__</div><span class="ic">&#8635;</span></div>
 <div class="bar bottom"><span class="ic">&lsaquo;</span><span class="ic">&rsaquo;</span><span class="ic">&#8962;</span><span class="ic">&#9783;</span><span class="ic" style="font-size:11px;border:1.5px solid #c9ceda;width:16px;height:16px;border-radius:4px">3</span><span class="ic hl">&#8801;</span></div>
 <div class="tip">&uarr; the three lines, bottom right</div></div></div></div>
@@ -1513,7 +1598,7 @@ section{display:none}section.on{display:block}
 
 <div class="after">
 <div class="step"><div class="n">4</div><div><p>Close the browser and open <b>__TITLE__</b> from your home screen - it opens full screen like any other app.</p></div></div>
-<div class="step"><div class="n">5</div><div><p>Tap <b>Nearest overnight doors to me now</b> and <b>allow location</b> when the phone asks. That is it.</p>
+<div class="step"><div class="n">5</div><div><p>Tap <b>Find clinics near me</b> and <b>allow location</b> when the phone asks. That is it.</p>
 <small>Your location is used on the phone only and never sent anywhere.</small></div></div>
 </div>
 <p class="help">Trouble getting it on your phone? __CONTACT_HTML__ &nbsp;<a href="./privacy.html">Privacy</a></p>
@@ -1532,7 +1617,7 @@ function show(p){document.querySelectorAll('section').forEach(s=>s.classList.tog
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>show(b.dataset.p));
 show(isIOS?'ios':isSamsung?'samsung':'android');
 if(!isIOS&&!isAndroid){document.getElementById('desk').hidden=false;document.getElementById('here').textContent=here;}
-if(standalone){document.getElementById('done').hidden=false;}
+if(standalone){document.getElementById('done').hidden=false;document.querySelectorAll('.tabs,section,.after,.desk').forEach(x=>x.style.display='none');document.querySelector('.hero h2').style.display='none';document.querySelectorAll('.hero p').forEach(x=>x.style.display='none');}
 else if(inApp){const w=document.getElementById('inapp');w.hidden=false;
  if(isAndroid){w.innerHTML='<b>You are inside '+appLabel+'\'s own browser</b>, which cannot save apps to the home screen.<a class="btn" href="intent://'+location.host+location.pathname+'#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='+encodeURIComponent(here)+';end">Open this page in Chrome</a>If nothing happens: tap &#8942; in the top corner, then <b>Open in Chrome</b> (or Open in browser), and follow the steps below there.';}
  else if(isIOS){w.innerHTML='<b>You are inside '+appLabel+'\'s own browser</b>, which cannot save apps to the home screen.<a class="btn" href="x-safari-'+here+'">Open this page in Safari</a>If nothing happens: tap &bull;&bull;&bull; in the corner, then <b>Open in Safari</b> (or Open in external browser), and follow the steps below there.';}
@@ -1573,22 +1658,24 @@ def _qr_svg(text):
     return '<div class="qr">' + svg + "</div>"
 
 
-def build_pwa(map_files=(), out_dir="pwa", title="Vet locator", subtitle="", app_url="", short_name="Vet locator",
-              builtin=None, description="", contact="", stamp="Sept 2026", site_url=""):
+def build_pwa(map_files=(), out_dir="pwa", title="MapAVet", subtitle="", app_url="", short_name="MapAVet",
+              builtin=None, description="", contact="", stamp="Sept 2026", site_url="", slogan="Never far from an open door."):
     """Packages the phone app as a flat folder (nothing to lose in an upload).  Each person's maps are added on their
     own phone and stay there; map_files are optional preloaded maps for a personal build.  builtin is a DataFrame of
-    verified overnight clinics (name, town, lat, lng, phone, hours, typ) that powers 'Nearest overnight doors' from
-    the first open.  app_url is the live Streamlit builder; site_url is where this folder will be hosted (used for the
-    link preview and the QR code on install.html, the page to send people).  Host the folder on any static site."""
+    hand-verified clinics (name, town, address, lat, lng, phone, hours, typ, sched) that powers 'Find clinics near me'
+    from the first open.  app_url is the live Streamlit builder (it can save maps straight into the app when opened
+    inside it); site_url is where this folder will be hosted (link preview + QR code on install.html, the page to send
+    people).  Host the folder on any static site."""
     out = pathlib.Path(out_dir); out.mkdir(parents=True, exist_ok=True)
     site_url = (site_url.rstrip("/") + "/") if site_url else ""
     css, js, icon_js = _leaflet_files()
     (out / "leaflet.css").write_text(css, encoding="utf-8"); (out / "leaflet.js").write_text(js, encoding="utf-8")
-    (out / "leaflet-icons.js").write_text(icon_js, encoding="utf-8")
+    (out / "leaflet-icons.js").write_text(icon_js, encoding="utf-8"); (out / "mymaps.js").write_text(_PWA_MYMAPS_JS, encoding="utf-8")
     head = _PWA_HEAD.replace("__SHORT__", _esc(short_name))
+    app_origin = json.dumps(re.sub(r"^(https?://[^/]+).*$", r"\1", app_url) if app_url else "")
     digest = hashlib.md5()
-    pre = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./leaflet.css", "./leaflet.js",
-           "./leaflet-icons.js", "./privacy.html"]
+    pre = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-512-maskable.png", "./leaflet.css", "./leaflet.js",
+           "./leaflet-icons.js", "./mymaps.js", "./privacy.html"]
     cards = []
     for mf in map_files:
         src = pathlib.Path(mf); page = _localize_map(src.read_text(encoding="utf-8"))
@@ -1597,46 +1684,58 @@ def build_pwa(map_files=(), out_dir="pwa", title="Vet locator", subtitle="", app
         cards.append(f'<a class="card" href="./{src.name}"><b>{t.group(1) if t else src.name}</b><span>{s.group(1) if s else ""}</span></a>')
     builtin_html = ""
     if builtin is not None and len(builtin):
-        rows = [{k: ("" if pd.isna(v) else v) for k, v in r.items()} for r in builtin[["name", "town", "lat", "lng", "phone", "hours", "typ"]].to_dict("records")]
+        b = builtin.copy()
+        for c in ("address", "sched"):
+            if c not in b: b[c] = "" if c == "address" else None
+        rows = []
+        for r in b[["name", "town", "address", "lat", "lng", "phone", "hours", "typ", "sched"]].to_dict("records"):
+            rec = {k: ("" if (not isinstance(v, list) and pd.isna(v)) else v) for k, v in r.items()}
+            rec["sched"] = rec["sched"] if isinstance(rec["sched"], list) else None
+            rec["lat"] = round(float(rec["lat"]), 4); rec["lng"] = round(float(rec["lng"]), 4); rows.append(rec)
         (out / "builtin.json").write_text(json.dumps(rows, separators=(",", ":")), encoding="utf-8"); pre.append("./builtin.json")
-        trs = "".join(f'<tr><td>{_esc(r["town"])}</td><td><b>{_esc(r["name"])}</b></td><td class="t-{r["typ"]}">{_esc(r["hours"])}</td>'
-                      f'<td>{("<a href=tel:" + r["phone"] + ">" + r["phone"] + "</a>") if r["phone"] else "-"}</td></tr>'
+        n_er = sum(1 for r in rows if r["typ"] in ("ER", "NIGHT"))
+        trs = "".join(f'<tr><td>{_esc(r["town"])}</td><td><b>{_esc(r["name"])}</b>' + (f'<br><span class="src">{_esc(r["address"])}</span>' if r["address"] else "") + '</td>'
+                      f'<td class="t-{r["typ"]}">{_esc(r["hours"])}</td>'
+                      f'<td style="white-space:nowrap">{("<a href=tel:" + r["phone"] + ">" + r["phone"] + "</a><br>") if r["phone"] else ""}'
+                      f'<a class="go" data-ll="{r["lat"]},{r["lng"]}" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination={r["lat"]},{r["lng"]}">Go</a></td></tr>'
                       for r in sorted(rows, key=lambda r: (str(r["town"])[-2:], str(r["town"]), r["name"])))
         (out / "verified.html").write_text(_PWA_VERIFIED.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__N__", str(len(rows)))
-                                           .replace("__STAMP__", _esc(stamp)).replace("__ROWS__", trs), encoding="utf-8"); pre.append("./verified.html")
-        builtin_html = (f'<h2>Built in</h2><a class="card" href="./verified.html"><b>{len(rows)} verified 24/7 and night clinics</b>'
-                        f'<span>Hand-checked listings ({_esc(stamp)}) along Denver metro, I-80/I-69 to Michigan and I-25/US-287/I-45 to Houston. '
-                        f'Used by Near me from the first open.</span></a>')
+                                           .replace("__NER__", str(n_er)).replace("__STAMP__", _esc(stamp)).replace("__ROWS__", trs), encoding="utf-8"); pre.append("./verified.html")
+        builtin_html = (f'<h2>Built in</h2><a class="card" href="./verified.html"><b>{len(rows)} hand-verified clinics</b>'
+                        f'<span>{n_er} open 24/7 or late. Checked against their listings ({_esc(stamp)}): Denver metro, Denver to Michigan (I-80 / I-69) '
+                        f'and Denver to Houston (I-25 / US-287 / I-45). Build a map to add any other area.</span></a>')
         digest.update(json.dumps(rows).encode())
     if cards:
         builtin_html = '<h2>Preloaded maps</h2>' + "\n".join(cards) + builtin_html
     live = ""
     if app_url:
-        (out / "live.html").write_text(_PWA_LIVE.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__APP__", _esc(app_url.rstrip("/"))), encoding="utf-8")
+        (out / "live.html").write_text(_PWA_LIVE.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__APP__", _esc(app_url.rstrip("/")))
+                                       .replace("__APP_ORIGIN__", app_origin), encoding="utf-8")
         pre.append("./live.html")
-        live = '<a class="btn blue" href="./live.html">Plan a trip or home map (live, needs signal)</a>'
-    (out / "index.html").write_text(_PWA_INDEX.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__SUB__", subtitle)
-                                    .replace("__LIVE__", live).replace("__BUILTIN__", builtin_html).replace("__LOCALIZE__", _LOCALIZE_JS), encoding="utf-8")
+        live = '<h2>Any other area</h2><a class="btn blue" href="./live.html">Build a map of a route or an address</a><div class="note" style="margin-top:-4px">Every clinic along any US drive or around any address, with hours and phone. Needs signal to build; the finished map saves to this phone.</div>'
+    (out / "index.html").write_text(_PWA_INDEX.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__SUB__", subtitle or _esc(slogan))
+                                    .replace("__LIVE__", live).replace("__BUILTIN__", builtin_html).replace("__APP_ORIGIN__", app_origin), encoding="utf-8")
     apphost = re.sub(r"^https?://", "", app_url).rstrip("/") if app_url else "the builder"
     (out / "privacy.html").write_text(_PWA_PRIVACY.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__APPHOST__", _esc(apphost))
                                       .replace("__CONTACT__", _esc(contact or "the app publisher")), encoding="utf-8")
     sitehost = re.sub(r"^https?://", "", site_url).rstrip("/") if site_url else "your-site.github.io"
     (out / "install.html").write_text(_PWA_INSTALL.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__SITE__", _esc(site_url or "./"))
-                                      .replace("__HOST__", _esc(sitehost)).replace("__DESC__", _esc(description or subtitle))
+                                      .replace("__HOST__", _esc(sitehost)).replace("__DESC__", _esc(description or subtitle or slogan)).replace("__SLOGAN__", _esc(slogan))
                                       .replace("__QR__", _qr_svg(site_url + "install.html") if site_url else "")
                                       .replace("__CONTACT_HTML__", (f'Email <a href="mailto:{_esc(contact)}">{_esc(contact)}</a>.' if contact else "Reply to whoever sent you this link.")), encoding="utf-8"); pre.append("./install.html")
     (out / "manifest.webmanifest").write_text(json.dumps({
-        "id": "./", "name": title, "short_name": short_name, "description": description or subtitle,
+        "id": "./", "name": title, "short_name": short_name, "description": description or subtitle or slogan,
         "start_url": "./index.html", "scope": "./", "display": "standalone", "orientation": "portrait", "lang": "en-US",
         "background_color": "#0e1116", "theme_color": "#151a22", "categories": ["medical", "navigation", "travel"],
         "icons": [{"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
                   {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-                  {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}, indent=1), encoding="utf-8")
+                  {"src": "./icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}, indent=1), encoding="utf-8")
     (out / "icon-192.png").write_bytes(_icon_png(192)); (out / "icon-512.png").write_bytes(_icon_png(512))
+    (out / "icon-512-maskable.png").write_bytes(_icon_png(512, maskable=True))
     (out / ".nojekyll").write_text("", encoding="utf-8")
     if not (out / "sponsor.json").exists():                 # one sponsored card on the home page; edit this file on the site to run it
         (out / "sponsor.json").write_text(json.dumps({"enabled": False, "title": "Sponsor title", "text": "One line of text.", "url": "https://example.com"}, indent=1), encoding="utf-8")
-    digest.update(app_url.encode()); digest.update(_PWA_INDEX.encode())
+    digest.update(app_url.encode()); digest.update(_PWA_INDEX.encode()); digest.update(_PWA_MYMAPS_JS.encode()); digest.update(_PWA_LIVE.encode())
     (out / "sw.js").write_text(_PWA_SW.replace("__VERSION__", digest.hexdigest()[:10]).replace("__PRECACHE__", json.dumps(pre)), encoding="utf-8")
     (out / "README.md").write_text(
         f"# {title} - phone app\n\nA static web app: host this folder and open it on a phone. Everyone's maps are added on their own phone and stay there.\n\n"
@@ -1648,8 +1747,10 @@ def build_pwa(map_files=(), out_dir="pwa", title="Vet locator", subtitle="", app
         "## The link to send people\n\n`.../install.html` - it explains that this is a web app, detects the phone (and the Instagram/Facebook in-app browser, which cannot install apps), "
         "offers a one-tap Install button where the browser supports it, and shows illustrated Add-to-Home-Screen steps for Safari, Chrome and Samsung Internet. "
         "On a computer it shows a QR code. Pass `site_url` to `build_pwa` so the QR code and link preview point at the right address.\n\n"
-        "## Adding a map on a phone\n\nBuild it in the live builder, tap **Save the map**, then on the app's home page tap **Add a saved map file** and pick the file. "
-        "It is stored on that phone only and works without signal.\n\n"
+        "## Clinics near me\n\nOne button, three choices: 24/7 ER (default), late night, or any clinic open right now (from each clinic's hours and the phone's clock). "
+        "Every result has the address, tap-to-call and a Directions button that opens the phone's own maps app. It uses the built-in hand-verified list plus every map saved on the phone, and works without signal.\n\n"
+        "## Saving a map\n\nOpen the builder from inside the app, build the map and tap **Save to this phone** - it appears under My maps. "
+        "**Add a map file** on the home page is for a map built on a computer or sent by someone else. Maps stay on that phone only.\n\n"
         "## Sponsored card\n\n`sponsor.json` controls one sponsored card on the home page: set `enabled` to true and fill in `title`, `text` and `url` "
         "(an affiliate or sponsor link). It is fetched fresh on every online open, so editing the file on the site changes it immediately. "
         "If you run it, declare 'Contains ads' in the Play listing.\n\n"
