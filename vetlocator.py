@@ -687,7 +687,23 @@ SAFARI Veterinary Care Centers (Dr. Garner) - DESTINATION,League City TX,"2402 M
 Marina Bay Animal Hospital,League City TX,"3030 Marina Bay Dr, League City TX 77573",29.5428,-95.0609,281-612-5858,M-F 7:30-6; Sa 7:30-12,4.8,DAY,texas"""
 
 
-def load_curated():
+def public_name(n):
+    """Clinic names as the public should see them: the personal annotations from the trip maps removed."""
+    n = re.sub(r"\s*\((HIS SPECIALTY HOME|Dr\. [A-Za-z]+|5 min from Safari|Flint SE backup)\)", "", str(n))
+    n = re.sub(r"\s*-\s*(SURGICAL HOME \(Dr\. [A-Za-z]+\)|DESTINATION)$", "", n)
+    return n.strip()
+
+
+def public_hours(h):
+    """Hours text without the personal notes (which specialist, which service we used)."""
+    h = re.sub(r"\s*\(Dr\. [A-Za-z]+\)", "", str(h))
+    h = re.sub(r"\+ specialty:.*$", "+ specialty", h)
+    return h.strip()
+
+
+def load_curated(public=True):
+    """The hand-verified rows.  public=True (the default, and what the shared builder and phone app use) strips the
+    personal trip notes from names and hours; public=False keeps them for the notebook owner's own maps."""
     import io
     df = pd.read_csv(io.StringIO(CURATED_CSV), dtype={"phone": str, "rating": str, "hours": str})
     df["source"] = "curated"
@@ -697,6 +713,8 @@ def load_curated():
     df["address"] = df["address"].fillna("")
     df["sched"] = [sched_compact(parse_hours_loose(h)) if t != "ER" else [[[0, 1440]]] * 7 for h, t in zip(df["hours"], df["typ"])]
     df["er_hint"] = df["typ"].isin(["ER", "NIGHT"])
+    if public:
+        df["name"] = df["name"].map(public_name); df["hours"] = df["hours"].map(public_hours); df["hours_raw"] = df["hours"]
     return df
 
 
@@ -1150,7 +1168,7 @@ def _live_label(prov):
 
 
 def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, google_link=None, track=None,
-                 title=None, provider="auto", corridor_mi=12, er_reach_mi=45, curated=True, out_html=None):
+                 title=None, provider="auto", corridor_mi=12, er_reach_mi=45, curated=True, out_html=None, public=True):
     """Any driving corridor in the US -> the same map/table as Harley's corridor maps, from live data.
     The road comes from one of: origin/destination (+ via stops) routed by OSRM; google_link, a Google Maps
     directions link whose stops become the route; or track, the text of a GPX/KML file used exactly as drawn.
@@ -1173,7 +1191,7 @@ def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, g
     variant = route_osrm([o] + [geocode(v) for v in variant_via] + [d]) if variant_via else None
     frames, warnings = [], []
     if curated:
-        frames.append(load_curated())
+        frames.append(load_curated(public=public))
     try:
         if prov == "google":
             try:
@@ -1226,14 +1244,14 @@ def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, g
             "gaps_overnight": gapsnight, "html": page, "provider": prov, "warnings": warnings}
 
 
-def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provider="auto", curated=True, out_html=None):
+def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provider="auto", curated=True, out_html=None, public=True):
     """Everything within radius_mi of a home address, sorted by distance, with the rings of Harley's home map.
     24/7, night and emergency-named clinics are kept out to twice the radius."""
     prov = _provider_pick(provider)
     lat, lng = geocode(home)
     frames, warnings = [], []
     if curated:
-        frames.append(load_curated())
+        frames.append(load_curated(public=public))
     try:
         if prov == "google":
             centers = [(lat, lng)]
