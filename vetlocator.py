@@ -15,7 +15,8 @@ OVERPASS_URLS = ["https://overpass.openstreetmap.fr/api/interpreter",
                  "https://overpass-api.de/api/interpreter",
                  "https://lz4.overpass-api.de/api/interpreter",
                  "https://overpass.private.coffee/api/interpreter",
-                 "https://overpass.kumi.systems/api/interpreter"]
+                 "https://overpass.kumi.systems/api/interpreter",
+                 "https://maps.mail.ru/osm/tools/overpass/api/interpreter"]
 PLACES_NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby"
 PLACES_TEXT_URL = "https://places.googleapis.com/v1/places:searchText"
 
@@ -424,7 +425,8 @@ def format_schedule(sched):
     return "; ".join(parts)
 
 
-NAME_ER_RE = re.compile(r"emergenc|\b24[\s/-]*(7|h|hr|hour)|urgent|after[\s-]*hours|\bER\b|critical care", re.I)
+# Names that suggest emergency care, including the 24/7 chains whose names often carry no emergency word (MedVet, BluePearl, VEG)
+NAME_ER_RE = re.compile(r"emergenc|\b24[\s/-]*(7|h|hr|hour)|urgent|after[\s-]*hours|\bER\b|critical care|\bmedvet\b|blue ?pearl|\bVEG\b", re.I)
 
 # OSM tags amenity=veterinary loosely; these are not places to take a sick dog at 2 am.
 NOISE_RE = re.compile(r"groom|day ?care|boarding|kennel|cafe|grill|adoption|shelter|humane society|pet store|petco\b|petsmart\b|"
@@ -785,11 +787,23 @@ def fetch_osm(boxes):
             failed.append((s, w, n, e)); continue
         for el in j["elements"]:
             els[(el["type"], el["id"])] = el
+    df = _osm_rows(els)
+    df.attrs["failed"] = failed
+    return df
+
+
+# "Pet resorts" and pet hotels are boarding, often tagged as vets with 24/7 hours; keep them only when the name says clinic
+RESORT_RE = re.compile(r"resort|pet hotel", re.I)
+CLINIC_WORD_RE = re.compile(r"clinic|hospital|veterinar|medical|\bvets?\b|\bdvm\b|emergenc", re.I)
+
+
+def _osm_rows(els):
+    """{(type, id): Overpass element} -> rows in the map schema; unnamed places and groomers/boarding/shelters are dropped."""
     rows = []
     for (typ_, oid), el in els.items():
         t = el.get("tags", {})
         name = t.get("name")
-        if not name or (NOISE_RE.search(name) and not NAME_ER_RE.search(name)):
+        if not name or (NOISE_RE.search(name) and not NAME_ER_RE.search(name)) or (RESORT_RE.search(name) and not CLINIC_WORD_RE.search(name)):
             continue
         lat = el.get("lat") or el.get("center", {}).get("lat"); lng = el.get("lon") or el.get("center", {}).get("lon")
         if lat is None:
@@ -809,8 +823,95 @@ def fetch_osm(boxes):
                      "website": t.get("website") or t.get("contact:website") or "",
                      "maps_url": "", "source": "OSM", "ext_id": f"{typ_}/{oid}",
                      "er_hint": bool(NAME_ER_RE.search(name) or t.get("emergency") == "yes")})
-    df = pd.DataFrame(rows)
-    df.attrs["failed"] = failed
+    return pd.DataFrame(rows)
+
+
+# Nationwide list for the phone app's "Find clinics near me": every OSM clinic in the US, so the button works wherever
+# the phone is, with no signal and without sending the phone's position anywhere.
+US_TILES = ([(s, w, n, w + 5) for (s, n), ws in {(24, 29): (-100, -85), (29, 34): range(-120, -75, 5),
+                                                 (34, 39): range(-125, -70, 5), (39, 44): range(-125, -65, 5),
+                                                 (44, 50): range(-125, -65, 5)}.items() for w in ws]
+            + [(51, -180, 60, -155), (51, -155, 60, -129), (60, -180, 72, -155), (60, -155, 72, -129),   # Alaska
+               (18.5, -161, 23, -154), (17.5, -68, 18.9, -64.3)])                                      # Hawaii, Puerto Rico + USVI
+US_STATES = {"AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California", "CO": "Colorado", "CT": "Connecticut",
+             "DE": "Delaware", "DC": "District of Columbia", "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho", "IL": "Illinois",
+             "IN": "Indiana", "IA": "Iowa", "KS": "Kansas", "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
+             "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi", "MO": "Missouri", "MT": "Montana",
+             "NE": "Nebraska", "NV": "Nevada", "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
+             "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma", "OR": "Oregon", "PA": "Pennsylvania",
+             "RI": "Rhode Island", "SC": "South Carolina", "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah",
+             "VT": "Vermont", "VA": "Virginia", "WA": "Washington", "WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming",
+             "PR": "Puerto Rico", "VI": "U.S. Virgin Islands"}
+_STATE_ABBR = {v.lower(): k for k, v in US_STATES.items()}
+_CA_PROVINCES = {"ab", "bc", "mb", "nb", "nl", "ns", "nt", "nu", "on", "pe", "qc", "sk", "yt", "alberta", "british columbia", "manitoba",
+                 "new brunswick", "newfoundland and labrador", "nova scotia", "northwest territories", "nunavut", "ontario",
+                 "prince edward island", "quebec", "québec", "saskatchewan", "yukon"}
+# North American numbering plan: these area codes are Canadian (or Caribbean), so a +1 number tells the countries apart
+_NON_US_AREA = set("204 226 236 249 250 257 263 289 306 343 354 365 367 368 382 403 416 418 428 431 437 438 450 468 474 506 514 "
+                   "519 548 579 581 584 587 600 604 613 639 647 672 683 705 709 742 753 778 780 782 807 819 825 867 873 879 902 905 "
+                   "242 246 264 268 284 345 441 473 649 658 664 721 758 767 784 809 829 849 868 869 876".split())
+
+
+def _osm_country(t, nearest_cc=""):
+    """Country of an OSM clinic from its own tags (country, state, postcode, phone, website), else the country of the
+    nearest town; the 5-degree download tiles also catch southern Canada and northern Mexico."""
+    c = (t.get("addr:country") or "").strip().upper()
+    if c:
+        return "US" if c in ("US", "USA", "PR", "VI") else c
+    st = (t.get("addr:state") or t.get("addr:province") or "").strip().lower()
+    if st.upper() in US_STATES or st in _STATE_ABBR:
+        return "US"
+    if st in _CA_PROVINCES:
+        return "CA"
+    if re.fullmatch(r"[A-Z]\d[A-Z] ?\d[A-Z]\d", (t.get("addr:postcode") or "").strip().upper()):
+        return "CA"
+    d = re.sub(r"\D", "", t.get("phone") or t.get("contact:phone") or "")
+    if d.startswith("52") and len(d) >= 12:
+        return "MX"
+    d = d[1:] if len(d) == 11 and d.startswith("1") else d
+    if len(d) == 10:
+        return "CA" if d[:3] in _NON_US_AREA else "US"
+    web = (t.get("website") or t.get("contact:website") or "").lower()
+    if re.search(r"\.ca(/|$)", web):
+        return "CA"
+    if re.search(r"\.mx(/|$)", web):
+        return "MX"
+    return "US" if nearest_cc in ("", "US", "PR", "VI", "GU", "AS", "MP") else nearest_cc
+
+
+def fetch_osm_us(elements=None):
+    """Every veterinary clinic in the US on OpenStreetMap, in the map schema.  Downloads 5-degree tiles through the
+    Overpass mirrors (each tile cached on disk, so a re-run is instant) unless Overpass elements are passed in.
+    Rows outside the US are dropped; rows with no town get the nearest town (needs the optional `reverse_geocode`
+    package, which also settles the country of untagged clinics near the borders)."""
+    if elements is None:
+        elements, failed = [], []
+        for (s, w, n, e) in US_TILES:
+            try:
+                elements += overpass(f'nwr["amenity"="veterinary"]({s},{w},{n},{e});out center tags;', timeout=90)["elements"]
+            except RuntimeError:
+                failed.append((s, w, n, e))
+        if failed:
+            print(f"{len(failed)} tiles failed (re-run to fill them in): {failed}")
+    ll = lambda el: (el.get("lat") or el.get("center", {}).get("lat"), el.get("lon") or el.get("center", {}).get("lon"))
+    els = {(el["type"], el["id"]): el for el in elements if el.get("tags", {}).get("name") and ll(el)[0] is not None}
+    pts = [ll(el) for el in els.values()]
+    try:
+        import reverse_geocode
+        near = reverse_geocode.search(pts) if pts else []
+    except ImportError:
+        near = [{}] * len(pts)
+    keep, towns = {}, {}
+    for (k, el), nr in zip(els.items(), near):
+        if _osm_country(el["tags"], nr.get("country_code", "")) == "US":
+            keep[k] = el
+            cc = nr.get("country_code", "")
+            st = _STATE_ABBR.get(str(nr.get("state", "")).lower()) or (cc if cc in ("PR", "VI") else "")
+            towns[f"{k[0]}/{k[1]}"] = f"{nr.get('city', '')} {st}".strip()
+    df = _osm_rows(keep)
+    if len(df):
+        blank = df["town"].fillna("").str.strip() == ""
+        df.loc[blank, "town"] = df.loc[blank, "ext_id"].map(towns).fillna("")
     return df
 
 
@@ -1436,6 +1537,9 @@ td{padding:7px 6px;border-bottom:1px solid #232a36;vertical-align:top}td a{color
 .small{font-size:13px;padding:10px}.note{color:#9aa3b2;font-size:12.5px;line-height:1.5}
 .toast{position:fixed;left:16px;right:16px;bottom:20px;background:#1b3324;border:1px solid #3fbf74;color:#b9f0cf;border-radius:12px;padding:12px 14px;font-size:14px;z-index:9999}.toast a{color:#fff;font-weight:700}
 td .go{display:inline-block;background:#2f6fd6;color:#fff;border-radius:7px;padding:3px 7px;font-size:12px;text-decoration:none}
+.where{display:flex;gap:6px;margin:0 0 6px}.where input{flex:1;min-width:0;background:#1a212c;border:1px solid #3a4356;color:#e8eaee;border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit}.where button{background:#242c3a;border:1px solid #3a4356;color:#fff;border-radius:10px;padding:0 14px;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer}
+.res .src{color:#6f7886;font-size:11.5px;margin-top:6px}.badge.ERQ{background:#4a2630;color:#ffb3b3}.usedat{color:#9aa3b2;font-size:12.5px;margin:6px 0 0}.usedat b{color:#e8eaee}
+.more{display:block;width:100%;background:none;border:1px solid #3a4356;color:#c9ceda;border-radius:10px;padding:9px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;margin:4px 0}
 </style>"""
 
 _PWA_INDEX = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__</title>__HEAD__<link rel="stylesheet" href="./leaflet.css"></head><body>
@@ -1445,13 +1549,14 @@ _PWA_INDEX = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__</title>__
 <h2>Veterinary clinics near me</h2>
 <div class="seg" id="mode"><button data-m="er" class="on">24/7 ER</button><button data-m="late">Late night</button><button data-m="open">Open now</button></div>
 <button class="btn" id="nearbtn">&#9673; Find clinics near me</button>
+<div class="where"><input id="place" type="search" enterkeyhint="search" autocomplete="off" placeholder="Town, ZIP or address" aria-label="Town, ZIP code or address"><button id="placebtn">Search</button></div>
 <div id="near"></div>
 <div id="nearmap"></div>
 __LIVE__
 __BUILTIN__
 <div id="sponsor"></div>
 <div id="mmsec" style="display:none"><h2>My maps</h2><div id="mymaps"></div></div>
-<div class="status" id="st">Works without signal: clinics near me, the built-in list and your saved maps. Needs signal: building a new map, directions, and map pictures the first time you look at an area. <a href="./install.html" id="howto">Put it on your home screen</a> &middot; <a href="./privacy.html">Privacy</a></div>
+<div class="status" id="st">Works without signal: clinics near me (anywhere in the US), the built-in list and your saved maps. Needs signal: searching a typed place, building a new map, directions, and map pictures the first time you look at an area. <a href="./install.html" id="howto">Put it on your home screen</a> &middot; <a href="./privacy.html">Privacy</a></div>
 <button class="btn grey" id="installbtn" style="display:none">&#11015; Install this app on your phone</button>
 <h2>Add a map file</h2>
 <label class="btn grey small" for="addmap">+ Add a map file</label><input id="addmap" type="file" accept=".html,text/html" style="display:none">
@@ -1474,41 +1579,85 @@ function renderMine(){const l=mmIdx(),box=document.getElementById('mymaps');box.
  box.querySelectorAll('.rm').forEach(b=>b.onclick=async e=>{e.preventDefault();await removeMap(b.dataset.id);renderMine();});}
 document.getElementById('addmap').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await saveMapHtml(await f.text(),f.name);renderMine();window.scrollTo({top:document.getElementById('mmsec').offsetTop-10,behavior:'smooth'});}catch(err){alert('That is not a map saved from the map builder.');}e.target.value='';};
 renderMine();listenForMaps(()=>renderMine());
-async function allClinics(){const seen={},out=[];const add=c=>{const k=c.name+'|'+(+c.lat).toFixed(3);if(!seen[k]){seen[k]=1;out.push(c);}};
- try{const b=await (await fetch('./builtin.json')).json();b.forEach(c=>{c.source='verified';add(c)});}catch(e){}
- try{const c=await caches.open('mymaps');for(const m of mmIdx()){const r=await c.match('./map-'+m.id+'.html');if(!r)continue;const t=await r.text();const mm=t.match(/const DATA=(\[[\s\S]*?\]); const MAIN=/);if(mm)JSON.parse(mm[1]).forEach(add);}}catch(e){}
+const ER_NAME=/emergenc|\b24[\s/-]*(7|h|hr|hour)|urgent|after[\s-]*hours|\bER\b|critical care|\bmedvet\b|blue ?pearl|\bVEG\b/i;
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}
+async function ownClinics(){const seen={},out=[];const add=(c,src)=>{const k=c.name+'|'+(+c.lat).toFixed(3);if(!seen[k]){seen[k]=1;c.source=src;c.er=c.typ==='UNK'&&ER_NAME.test(c.name||'');out.push(c);}};
+ try{const b=await (await fetch('./builtin.json')).json();b.forEach(c=>add(c,'verified'));}catch(e){}
+ try{const c=await caches.open('mymaps');for(const m of mmIdx()){const r=await c.match('./map-'+m.id+'.html');if(!r)continue;const t=await r.text();const mm=t.match(/const DATA=(\[[\s\S]*?\]); const MAIN=/);if(mm)JSON.parse(mm[1]).forEach(x=>add(x,'saved'));}}catch(e){}
  return out;}
+let NAT=null,NATDATE='';
+async function nationwide(){if(NAT)return NAT;try{const j=await (await fetch('./clinics-us.json')).json();const T={E:'ER',N:'NIGHT',X:'EXT',D:'DAY',U:'UNK'};NATDATE=j.date||'';
+ NAT=j.rows.map(r=>({name:r[0],lat:r[1],lng:r[2],typ:T[r[3]]||'UNK',phone:r[4],address:r[5],hours:r[6],sched:r[7]||null,er:r[3]==='U'&&!!r[8],source:'osm'}));}catch(e){return [];}return NAT;}
+const STOP=new Set('veterinary veterinarian veterinarians vet vets animal animals hospital hospitals clinic clinics pet pets center centre care the of and emergency specialty specialists specialist referral services service medical medicine health urgent er 24 7 hour hours inc llc pc pllc dvm at'.split(' '));
+function toks(n){return String(n||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(w=>w.length>1&&!STOP.has(w));}
+function same(a,b){const d=hav(a.lat,a.lng,b.lat,b.lng);if(d<0.03)return true;if(d>0.3)return false;const B=new Set(toks(b.name));return toks(a.name).some(w=>B.has(w));}
 function openNow(c,now){if(c.typ==='ER')return true;const s=c.sched;if(!s)return null;const d=(now.getDay()+6)%7,m=now.getHours()*60+now.getMinutes();
  for(const iv of (s[d]||[]))if(iv[0]<=m&&m<iv[1])return true;for(const iv of (s[(d+6)%7]||[]))if(iv[1]>1440&&m<iv[1]-1440)return true;return false;}
+function wanted(c,now){if(mode==='er')return c.typ==='ER'||c.er;if(mode==='late')return c.typ==='ER'||c.typ==='NIGHT'||c.er;return openNow(c,now)===true||c.er;}
 const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 function dirUrl(c){return IOS?'https://maps.apple.com/?daddr='+c.lat+','+c.lng+'&q='+encodeURIComponent(c.name):'https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng;}
+const ICO_FIND='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>';
 const ICO_GO='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3 3 10.5l8 2.5 2.5 8L21 3z"/></svg>',ICO_CALL='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.6a1 1 0 0 1-.25 1L6.6 10.8z"/></svg>';
-let mode='er',nearMap=null,nearLayer=null,lastPos=null;
-document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));if(lastPos)showNear(lastPos);});
-function row(c){const typ=c.typ||'UNK';const badge={ER:'24/7 ER',NIGHT:'late night',EXT:'extended hrs',DAY:'daytime',UNK:'hours unknown'}[typ]||typ;
- return '<div class="res"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>'+c.name+'</b><span class="badge '+typ+'">'+badge+'</span></div><span class="d">'+c.d.toFixed(1)+' mi</span></div>'
- +'<div class="addr">'+(c.address||c.town||'')+'</div><div class="hrs">'+(c.hours||'')+'</div>'
- +'<div class="acts">'+(c.phone?'<a class="act call" href="tel:'+c.phone+'">'+ICO_CALL+' Call</a>':'<span class="act" style="opacity:.5">no phone listed</span>')+'<a class="act go" target="_blank" rel="noopener" href="'+dirUrl(c)+'">'+ICO_GO+' Directions</a></div></div>';}
-async function showNear(p){lastPos=p;const la=p.coords.latitude,lo=p.coords.longitude;const all=await allClinics();const now=new Date();
- all.forEach(c=>{c.d=hav(la,lo,c.lat,c.lng)});
- let pick=mode==='er'?all.filter(c=>c.typ==='ER'):mode==='late'?all.filter(c=>c.typ==='ER'||c.typ==='NIGHT'):all.filter(c=>openNow(c,now)===true);
- pick.sort((a,b)=>a.d-b.d);const top=pick.slice(0,6);const box=document.getElementById('near');
+let mode='er',nearMap=null,nearLayer=null,lastPos=null,limit=6;
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;limit=6;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));if(lastPos)showNear(lastPos);});
+function row(c){const typ=c.typ||'UNK',er=typ==='UNK'&&c.er;const badge=er?'ER? call first':({ER:'24/7 ER',NIGHT:'late night',EXT:'extended hrs',DAY:'daytime',UNK:'hours unknown'}[typ]||typ);
+ const hrs=c.hours?esc(c.hours):(typ==='UNK'?'Hours not listed - call first':''),tel=String(c.phone||'').replace(/[^0-9+]/g,'');
+ const src={verified:'Hand-verified',saved:'From your saved map',osm:'OpenStreetMap listing'}[c.source]||'';
+ return '<div class="res"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>'+esc(c.name)+'</b><span class="badge '+(er?'ERQ':typ)+'">'+badge+'</span></div><span class="d">'+c.d.toFixed(1)+' mi</span></div>'
+ +'<div class="addr">'+esc(c.address||c.town||'')+'</div><div class="hrs">'+hrs+(er&&!/call to confirm/i.test(c.hours||'')?'<br>The name suggests emergency care - call to confirm it is open.':'')+'</div>'
+ +'<div class="acts">'+(tel?'<a class="act call" href="tel:'+tel+'">'+ICO_CALL+' Call</a>':'<a class="act" target="_blank" rel="noopener" href="https://www.google.com/search?q='+encodeURIComponent(c.name+' '+(c.address||c.town||'')+' phone')+'">'+ICO_FIND+' Find phone</a>')+'<a class="act go" target="_blank" rel="noopener" href="'+dirUrl(c)+'">'+ICO_GO+' Directions</a></div>'
+ +(src?'<div class="src">'+src+'</div>':'')+'</div>';}
+async function showNear(p){lastPos=p;const la=p.la,lo=p.lo,box=document.getElementById('near');
+ const own=await ownClinics(),nat=await nationwide(),now=new Date();
+ own.forEach(c=>{c.d=hav(la,lo,c.lat,c.lng)});const ownNear=own.filter(c=>c.d<500);
+ const pool=ownNear.filter(c=>wanted(c,now));
+ for(const c of nat){if(Math.abs(c.lat-la)>8)continue;c.d=hav(la,lo,c.lat,c.lng);if(c.d<500&&wanted(c,now))pool.push(c);}
+ pool.sort((a,b)=>a.d-b.d);const top=[];
+ for(const c of pool){if(top.length>=limit)break;if(c.source==='osm'&&ownNear.some(o=>same(o,c)))continue;if(top.some(t=>same(t,c)))continue;top.push(c);}
  const label={er:'24/7 emergency hospitals',late:'24/7 and late-night clinics',open:'clinics open right now'}[mode];
- box.innerHTML=(top.length?'<div style="color:#ffd94d;font-weight:700;margin:6px 0 2px">Nearest '+label+'</div>'+top.map(row).join(''):'<div class="res">No '+label+' in the built-in list or your saved maps near here. Try another option above, or build a map of your area.</div>')
-  +'<div class="note" style="margin-top:6px">Straight-line miles. '+(mode==='open'?'Clinics whose hours are not listed are left out of Open now. ':'')+'Always call before driving - hours change.</div>';
+ let h='<div class="usedat">Near <b>'+esc(p.label)+'</b></div>';
+ if(top.length){h+='<div style="color:#ffd94d;font-weight:700;margin:6px 0 2px">Nearest '+label+'</div>'+top.map(row).join('');
+  if(pool.length>top.length)h+='<button class="more" id="more">Show more</button>';
+  if(top[0].d>60)h+='<div class="res">The nearest one listed is '+Math.round(top[0].d)+' miles away. Public listings miss some clinics and many hours, so call ahead - and with signal, <a href="./live.html" style="color:#8fc1ff">build a map</a> of your area for a fuller search.</div>';}
+ else h+='<div class="res">No '+label+' listed within 500 miles'+(nat.length?'':' (the nationwide list has not downloaded yet - open the app once with signal)')+'. Try another option above, or with signal <a href="./live.html" style="color:#8fc1ff">build a map</a> of your area.</div>';
+ h+='<div class="note" style="margin-top:6px">Straight-line miles. '+(mode==='open'?'Clinics whose hours are not listed are left out of Open now, except ones whose name says emergency. ':'')+'Always call before driving - hours change.'+(nat.length?' Clinics outside the hand-verified list: &copy; OpenStreetMap contributors'+(NATDATE?' ('+esc(NATDATE)+')':'')+'.':'')+'</div>';
+ box.innerHTML=h;const mb=document.getElementById('more');if(mb)mb.onclick=()=>{limit+=6;showNear(lastPos);};
  try{const mapEl=document.getElementById('nearmap');mapEl.style.display='block';
   if(!nearMap){nearMap=L.map('nearmap',{zoomControl:false,attributionControl:false});L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(nearMap);}
-  if(nearLayer)nearLayer.remove();nearLayer=L.layerGroup().addTo(nearMap);const col={ER:'#ff5252',NIGHT:'#ffab2e',EXT:'#ffe14d',DAY:'#4d9bff',UNK:'#9aa3b2'};
-  L.circleMarker([la,lo],{radius:7,color:'#fff',fillColor:'#2f6fd6',fillOpacity:1,weight:2}).addTo(nearLayer).bindPopup('You are here');
-  top.forEach(c=>L.circleMarker([c.lat,c.lng],{radius:8,color:'#fff',weight:1.5,fillColor:col[c.typ]||col.UNK,fillOpacity:1}).addTo(nearLayer).bindPopup('<b>'+c.name+'</b><br>'+(c.address||c.town||'')+'<br>'+c.d.toFixed(1)+' mi &middot; <a href="'+dirUrl(c)+'" target="_blank">Directions</a>'));
+  if(nearLayer)nearLayer.remove();nearLayer=L.layerGroup().addTo(nearMap);const col={ER:'#ff5252',NIGHT:'#ffab2e',EXT:'#ffe14d',DAY:'#4d9bff',UNK:'#9aa3b2',ERQ:'#ff9a9a'};
+  L.circleMarker([la,lo],{radius:7,color:'#fff',fillColor:'#2f6fd6',fillOpacity:1,weight:2}).addTo(nearLayer).bindPopup(p.label==='your location'?'You are here':esc(p.label));
+  top.forEach(c=>L.circleMarker([c.lat,c.lng],{radius:8,color:'#fff',weight:1.5,fillColor:col[c.typ==='UNK'&&c.er?'ERQ':c.typ]||col.UNK,fillOpacity:1}).addTo(nearLayer).bindPopup('<b>'+esc(c.name)+'</b><br>'+esc(c.address||c.town||'')+'<br>'+c.d.toFixed(1)+' mi &middot; <a href="'+dirUrl(c)+'" target="_blank">Directions</a>'));
   const pts=[[la,lo]].concat(top.map(c=>[c.lat,c.lng]));nearMap.fitBounds(L.latLngBounds(pts).pad(0.2));setTimeout(()=>nearMap.invalidateSize(),50);
  }catch(e){}
 }
-document.getElementById('nearbtn').onclick=()=>{
- const box=document.getElementById('near');box.innerHTML='<div class="res">Getting your location...</div>';
- if(!navigator.geolocation){box.innerHTML='<div class="res">This browser cannot give a location.</div>';return;}
- navigator.geolocation.getCurrentPosition(showNear,()=>{box.innerHTML='<div class="res">Location unavailable - allow location access for this app and try again.</div>'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
-};
+function locErr(e){const code=e&&e.code;let msg;
+ if(code===1)msg=IOS?'Location is turned off for this app. On your iPhone open <b>Settings &rarr; Privacy &amp; Security &rarr; Location Services</b>, make sure it is on, then tap <b>Safari Websites</b> and choose <b>While Using the App</b>. If it is still blocked: <b>Settings &rarr; Safari</b> (or <b>Settings &rarr; Apps &rarr; Safari</b>) &rarr; <b>Location</b> &rarr; <b>Allow</b>. Come back and tap Find clinics near me again.'
+  :'Location is blocked for this app. Allow it in your phone settings (<b>Settings &rarr; Apps &rarr; MapAVet</b> or your browser &rarr; <b>Permissions &rarr; Location</b>), then tap Find clinics near me again.';
+ else if(code===3)msg='Your phone is taking too long to find its location (this happens indoors or with a weak GPS signal).';
+ else msg='Your phone could not work out where it is right now.';
+ document.getElementById('near').innerHTML='<div class="res">'+msg+'<br><br>Or type a town, ZIP code or address in the box above and tap <b>Search</b>.<div class="note" style="margin-top:6px">(location error '+(code||'?')+(e&&e.message?': '+esc(e.message):'')+')</div></div>';}
+function locate(){document.getElementById('near').innerHTML='<div class="res">Getting your location...</div>';limit=6;
+ if(!navigator.geolocation){locErr({code:2,message:'this browser has no location service'});return;}
+ const ok=q=>showNear({la:q.coords.latitude,lo:q.coords.longitude,label:'your location'});
+ navigator.geolocation.getCurrentPosition(ok,e=>{if(e.code===3)navigator.geolocation.getCurrentPosition(ok,locErr,{enableHighAccuracy:true,timeout:20000,maximumAge:0});else locErr(e);},{enableHighAccuracy:false,timeout:12000,maximumAge:600000});}
+document.getElementById('nearbtn').onclick=locate;
+async function geocode(q){const get=async u=>{const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json();};
+ try{const j=await get('https://photon.komoot.io/api/?limit=5&lang=en&bbox=-180,15,-64,72&q='+encodeURIComponent(q));
+  const f=(j.features||[]).find(f=>['US','PR','VI'].includes((f.properties||{}).countrycode));
+  if(f){const p=f.properties;const first=p.housenumber&&p.street?p.housenumber+' '+p.street:(p.name||p.street||'');
+   return {la:f.geometry.coordinates[1],lo:f.geometry.coordinates[0],label:[first,p.city&&p.city!==first?p.city:'',p.state].filter(Boolean).join(', ')||q};}}catch(e){}
+ try{const j=await get('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us,pr,vi&q='+encodeURIComponent(q));
+  if(j[0])return {la:+j[0].lat,lo:+j[0].lon,label:j[0].display_name.split(',').slice(0,3).join(',')};}catch(e){}
+ return null;}
+async function searchPlace(){const inp=document.getElementById('place'),q=inp.value.trim();if(!q)return;inp.blur();limit=6;
+ try{localStorage.setItem('mapavet.place',q);}catch(e){}
+ const box=document.getElementById('near');box.innerHTML='<div class="res">Looking up '+esc(q)+'...</div>';
+ const g=await geocode(q);
+ if(!g){box.innerHTML='<div class="res">'+(navigator.onLine?'Could not find "'+esc(q)+'". Try a town and state, a ZIP code, or a full street address.':'Searching a typed place needs signal. <b>Find clinics near me</b> works without signal.')+'</div>';return;}
+ showNear(g);}
+document.getElementById('placebtn').onclick=searchPlace;
+document.getElementById('place').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchPlace();}});
+try{const v=localStorage.getItem('mapavet.place');if(v)document.getElementById('place').value=v;}catch(e){}
 </script></body></html>"""
 
 _PWA_LIVE = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - map builder</title>__HEAD__
@@ -1531,10 +1680,10 @@ _PWA_PRIVACY = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - priva
 <body><header><div><h1>Privacy</h1><div class="sub"><a href="./index.html">&larr; back</a></div></div></header>
 <main style="font-size:14px;line-height:1.6">
 <p><b>__TITLE__</b> does not collect, store or transmit personal information, and has no accounts.</p>
-<p><b>Location.</b> When you tap "Find clinics near me" or "Near me", the app asks the phone for its position and uses it on the phone to sort clinics by distance. The position is not sent anywhere and is not kept. Tapping "Directions" opens your phone's own maps app with the clinic's location.</p>
+<p><b>Location.</b> When you tap "Find clinics near me" or "Near me", the app asks the phone for its position and uses it on the phone to sort clinics by distance; the list of clinics it searches is stored in the app. The position is not sent anywhere and is not kept. If you type a town, ZIP code or address instead, that text (not your position) is sent to Photon (komoot) or OpenStreetMap's Nominatim to find the place. Tapping "Directions" opens your phone's own maps app with the clinic's location.</p>
 <p><b>Saved maps.</b> Maps you add are stored in this app's own storage on your phone. They are not uploaded. Removing the app removes them.</p>
 <p><b>Third-party services.</b> Map background tiles are requested from Esri and the U.S. Geological Survey when you look at a map with internet access; those requests carry the map area being viewed. The live builder (__APPHOST__) is a separate web page: addresses you type there are sent to routing and geocoding services (OSRM, U.S. Census Bureau, ArcGIS, Photon, OpenStreetMap) and, when configured, Google Places, to produce the map. It stores nothing about you beyond temporary caching needed to build the map.</p>
-<p><b>Clinic information</b> comes from public listings and is provided as a convenience; always call ahead. Nothing here is veterinary advice.</p>
+<p><b>Clinic information</b> comes from public listings and OpenStreetMap (&copy; OpenStreetMap contributors, ODbL) and is provided as a convenience; always call ahead. Nothing here is veterinary advice.</p>
 <p>Contact: __CONTACT__</p>
 </main></body></html>"""
 
@@ -1689,11 +1838,13 @@ def _qr_svg(text):
 
 
 def build_pwa(map_files=(), out_dir="pwa", title="MapAVet", subtitle="", app_url="", short_name="MapAVet",
-              builtin=None, description="", contact="", stamp="Sept 2026", site_url="", slogan="Never far from an open door."):
+              builtin=None, description="", contact="", stamp="Sept 2026", site_url="", slogan="Never far from an open door.",
+              nationwide=None, nationwide_stamp=""):
     """Packages the phone app as a flat folder (nothing to lose in an upload).  Each person's maps are added on their
     own phone and stay there; map_files are optional preloaded maps for a personal build.  builtin is a DataFrame of
     hand-verified clinics (name, town, address, lat, lng, phone, hours, typ, sched) that powers 'Find clinics near me'
-    from the first open.  app_url is the live Streamlit builder (it can save maps straight into the app when opened
+    from the first open; nationwide (fetch_osm_us()) adds every OpenStreetMap clinic in the US so that button works
+    anywhere, offline, without the phone's position leaving it.  app_url is the live Streamlit builder (it can save maps straight into the app when opened
     inside it); site_url is where this folder will be hosted (link preview + QR code on install.html, the page to send
     people).  Host the folder on any static site."""
     out = pathlib.Path(out_dir); out.mkdir(parents=True, exist_ok=True)
@@ -1733,8 +1884,23 @@ def build_pwa(map_files=(), out_dir="pwa", title="MapAVet", subtitle="", app_url
                                            .replace("__NER__", str(n_er)).replace("__STAMP__", _esc(stamp)).replace("__ROWS__", trs), encoding="utf-8"); pre.append("./verified.html")
         builtin_html = (f'<h2>Built in</h2><a class="card" href="./verified.html"><b>{len(rows)} hand-verified clinics</b>'
                         f'<span>{n_er} open 24/7 or late. Checked against their listings ({_esc(stamp)}): Denver metro, Denver to Michigan (I-80 / I-69) '
-                        f'and Denver to Houston (I-25 / US-287 / I-45). Build a map to add any other area.</span></a>')
+                        f'and Denver to Houston (I-25 / US-287 / I-45).</span></a>')
         digest.update(json.dumps(rows).encode())
+    if nationwide is not None and len(nationwide):
+        code = {"ER": "E", "NIGHT": "N", "EXT": "X", "DAY": "D", "UNK": "U"}
+        recs = []
+        for r in nationwide.to_dict("records"):
+            addr, town = str(r.get("address") or "").strip(), str(r.get("town") or "").strip()
+            if town and town.split(" ")[0].lower() not in addr.lower():
+                addr = f"{addr}, {town}" if addr else town
+            known = r["typ"] != "UNK"
+            recs.append([r["name"], round(float(r["lat"]), 4), round(float(r["lng"]), 4), code.get(r["typ"], "U"), r.get("phone") or "", addr,
+                         (r.get("hours") or "") if known else str(r.get("hours_raw") or ""),
+                         r["sched"] if isinstance(r.get("sched"), list) else 0, 1 if r.get("er_hint") else 0])
+        nat = json.dumps({"src": "OpenStreetMap contributors (ODbL)", "date": nationwide_stamp, "rows": recs}, separators=(",", ":"), ensure_ascii=False)
+        (out / "clinics-us.json").write_text(nat, encoding="utf-8"); pre.append("./clinics-us.json"); digest.update(nat.encode())
+        builtin_html += (f'<div class="note" style="margin-top:-2px">Clinics near me also searches {len(recs):,} clinics across the US from '
+                         f'OpenStreetMap{" (" + _esc(nationwide_stamp) + ")" if nationwide_stamp else ""}, stored on this phone. Many have no hours listed - call first.</div>')
     if cards:
         builtin_html = '<h2>Preloaded maps</h2>' + "\n".join(cards) + builtin_html
     live = ""
@@ -1778,7 +1944,8 @@ def build_pwa(map_files=(), out_dir="pwa", title="MapAVet", subtitle="", app_url
         "offers a one-tap Install button where the browser supports it, and shows illustrated Add-to-Home-Screen steps for Safari, Chrome and Samsung Internet. "
         "On a computer it shows a QR code. Pass `site_url` to `build_pwa` so the QR code and link preview point at the right address.\n\n"
         "## Clinics near me\n\nOne button, three choices: 24/7 ER (default), late night, or any clinic open right now (from each clinic's hours and the phone's clock). "
-        "Every result has the address, tap-to-call and a Directions button that opens the phone's own maps app. It uses the built-in hand-verified list plus every map saved on the phone, and works without signal.\n\n"
+        "Every result has the address, tap-to-call and a Directions button that opens the phone's own maps app. It uses the built-in hand-verified list, every map saved on the phone "
+        "and `clinics-us.json` (every OpenStreetMap clinic in the US), so it works anywhere and without signal. If the phone cannot give a location, a typed town, ZIP code or address works instead (needs signal).\n\n"
         "## Saving a map\n\nOpen the builder from inside the app, build the map and tap **Save to this phone** - it appears under My maps. "
         "**Add a map file** on the home page is for a map built on a computer or sent by someone else. Maps stay on that phone only.\n\n"
         "## Sponsored card\n\n`sponsor.json` controls one sponsored card on the home page: set `enabled` to true and fill in `title`, `text` and `url` "
