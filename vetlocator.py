@@ -462,7 +462,7 @@ Church Ranch Veterinary Center,Westminster,"8308 Church Ranch Blvd, Broomfield C
 Olde Town Veterinary Clinic,Arvada,"7709 Ralston Road, Arvada CO 80002",39.8023,-105.0835,720-328-3301,M-F 8-5,4.9,DAY,home
 UrgentVet Broomfield,Broomfield,"4700 West 121st Avenue, Broomfield CO 80020",39.9145,-105.0488,303-622-1600,M-F 3-11pm; Sa-Su 10-8,4.7,NIGHT,home
 Animal Urgent Care - W 64th Ave,Arvada,"12520 West 64th Avenue, Arvada CO 80004",39.8118,-105.1392,303-420-7387,OPEN 24/7,4.6,ER,home
-WRAH - Wheat Ridge Animal Hospital (HIS SPECIALTY HOME),Wheat Ridge,"10140 West 44th Avenue, Wheat Ridge CO 80033",39.7771,-105.111,303-424-3325,"OPEN 24/7 + specialty: neuro (Dr. Djani), IM, surgery",4.1,ER,home
+WRAH - Wheat Ridge Animal Hospital,Wheat Ridge,"10140 West 44th Avenue, Wheat Ridge CO 80033",39.7771,-105.111,303-424-3325,OPEN 24/7 + specialty,4.1,ER,home
 RiNoVet Animal Emergency,Denver,"4495 Washington Street, Denver CO 80216",39.778,-104.9797,303-458-5555,OPEN 24/7,4.2,ER,home
 Arvada Flats Veterinary Hospital,Arvada,"6305 Eldridge St, Arvada CO 80004",39.8111,-105.1572,303-467-9212,M-F 8-7; Sa 8-1,4.8,EXT,home
 Northside Emergency Pet Clinic,Westminster,"945 West 124th Avenue, Westminster CO 80234",39.9225,-104.9986,303-252-7722,OPEN 24/7,4.2,ER,home
@@ -472,7 +472,7 @@ Evolution Veterinary Specialty & Emergency,Lakewood,"34 Van Gordon St, Lakewood 
 BluePearl Pet Hospital - Lafayette,Lafayette,"2000 West South Boulder Road;W South Boulder Rd, Lafayette CO 80026",39.9874,-105.1167,720-699-7766,OPEN 24/7 specialty + ER,4.6,ER,home
 VRCC Veterinary Specialty & Emergency,Englewood,"3550 S Jason St, Englewood CO 80110",39.6524,-104.9987,303-923-5790,OPEN 24/7,4.2,ER,home
 VEG ER - Hampden,Denver,"6305 East Hampden Avenue, Denver CO 80222",39.6534,-104.9171,720-739-6003,OPEN 24/7,4.7,ER,home
-CSU Veterinary Teaching Hospital - SURGICAL HOME (Dr. Monnet),Fort Collins,"500 West Pitkin Street, Fort Collins CO 80523",40.5719,-105.085,970-297-5000,OPEN 24/7 academic,4.4,ER,home
+CSU Veterinary Teaching Hospital,Fort Collins,"500 West Pitkin Street, Fort Collins CO 80523",40.5719,-105.085,970-297-5000,OPEN 24/7 academic,4.4,ER,home
 Animal Care Hospital of Morris,Morris IL,"221 Bedford Road, Morris IL 60450",41.3715,-88.4244,815-941-9924,M-F 8-5; Sa 8-12,4.8,DAY,flint
 Pine Bluff Animal Hospital,Morris IL,"3935 N Dresden Rd, Coal City IL 60416",41.3454,-88.2681,815-942-5365,M-F 8-5:30; Sa 8-12,4.8,DAY,flint
 Lakewood Animal Hospital,Morris IL,"1301 Lakewood Dr, Morris IL 60450",41.369,-88.4426,815-942-1199,M/Tu/Th/F 8-5:30,4.9,DAY,flint
@@ -607,7 +607,7 @@ MSU Veterinary Medical Center,Lansing MI,"824 Wilson Rd, East Lansing MI 48824",
 Greater Lansing Veterinary Center,Williamston MI,"1290 W Grand River Ave, Williamston MI 48895",42.6896,-84.3049,517-708-2525,"OPEN 24/7 (E of Lansing, Flint approach)",3.5,ER,flint
 Emergency Veterinary Hospital - Ann Arbor,Ann Arbor MI,"5245 Jackson Road, Ann Arbor MI 48103",42.2869,-83.834,734-369-6446,OPEN 24/7 (45 min S of Flint),3.8,ER,flint
 Animal Emergency Center - Novi,Novi MI,"24400 Novi Road, Novi MI 48375",42.4687,-83.4743,248-348-1788,OPEN 24/7,3.8,ER,flint
-MedVet Commerce (Flint SE backup),Commerce Twp MI,"1120 Welch Rd, Commerce Township MI 48390",42.544,-83.4576,248-960-7200,OPEN 24/7,4.3,ER,flint
+MedVet Commerce,Commerce Twp MI,"1120 Welch Rd, Commerce Township MI 48390",42.544,-83.4576,248-960-7200,OPEN 24/7,4.3,ER,flint
 Cross Veterinary Clinic,Grand Blanc MI,"5490 Ali Dr, Grand Blanc MI 48439",42.9447,-83.678,810-406-1494,M/Tu 9-6; W-F 9-5,4.8,DAY,flint
 Animal Emergency Hospital,Burton MI (Flint),"1148 E Bristol Rd, Burton MI 48529",42.9739,-83.6872,810-238-7557,Daily 8am-MIDNIGHT (W/Th from noon),3.7,NIGHT,flint
 Grand Blanc Veterinary Hospital,Grand Blanc MI,"6137 S Saginaw Rd, Grand Blanc MI 48439",42.942,-83.6469,810-694-8241,M-F 8:30-5; Sa 8:30-12,4.5,DAY,flint
@@ -680,19 +680,20 @@ VEG ER - Houston Katy Fwy,Houston TX,"2785 Katy Fwy, Houston TX 77007",29.7762,-
 Pearland 288 Animal Emergency (Silverlake),Pearland TX,"10034 West Broadway Street, Pearland TX 77584",29.555,-95.3765,713-482-4592,OPEN 24/7,3.6,ER,texas
 VCA Animal Emergency Hospital Southeast (Gulf Fwy),Houston TX,"10331 Gulf Fwy, Houston TX 77034",29.6434,-95.2445,713-941-8460,NIGHT: M-Th 6pm-8am; F 6pm-mid; Sa-Su 24h - ON I-45,3.4,NIGHT,texas
 Friendswood Veterinary Hospital,Friendswood TX,"111 Woodland Trail Dr, Friendswood TX 77546",29.5405,-95.2012,281-993-4417,M-F 8-5,5.0,DAY,texas
-VEG ER - Friendswood (5 min from Safari),Friendswood TX,"18980 Gulf Fwy, Friendswood TX 77546",29.5453,-95.1473,281-544-0748,OPEN 24/7,4.8,ER,texas
+VEG ER - Friendswood,Friendswood TX,"18980 Gulf Fwy, Friendswood TX 77546",29.5453,-95.1473,281-544-0748,OPEN 24/7,4.8,ER,texas
 Friendswood Animal Clinic,Friendswood TX,"1401 South Friendswood Drive, Friendswood TX 77546",29.5135,-95.189,281-482-1258,M-F 8-6; Sa 8-12,4.8,DAY,texas
 GCVS NASA Parkway,Webster TX,"20610 Gulf Fwy, Webster TX 77598",29.5288,-95.1324,346-788-4103,OPEN 24/7,4.2,ER,texas
 League City Animal Clinic,League City TX,"2204 West Main Street, League City TX 77573",29.5015,-95.1224,281-332-0644,M-Th 8-6; F 8-5,4.7,DAY,texas
 Bay Creek Animal Clinic,League City TX,"1236 E Main St, League City TX 77573",29.516,-95.0846,281-332-3051,M-F 7:30-6 (W to 5),4.7,DAY,texas
-SAFARI Veterinary Care Centers (Dr. Garner) - DESTINATION,League City TX,"2402 Marina Bay Dr, League City TX 77573",29.5264,-95.0748,281-332-5612,M-F 6am-8pm; Sa-Su 9-6,4.5,EXT,texas
+SAFARI Veterinary Care Centers,League City TX,"2402 Marina Bay Dr, League City TX 77573",29.5264,-95.0748,281-332-5612,M-F 6am-8pm; Sa-Su 9-6,4.5,EXT,texas
 Marina Bay Animal Hospital,League City TX,"3030 Marina Bay Dr, League City TX 77573",29.5428,-95.0609,281-612-5858,M-F 7:30-6; Sa 7:30-12,4.8,DAY,texas"""
 
 
 def public_name(n):
-    """Clinic names as the public should see them: the personal annotations from the trip maps removed."""
-    n = re.sub(r"\s*\((HIS SPECIALTY HOME|Dr\. [A-Za-z]+|5 min from Safari|Flint SE backup)\)", "", str(n))
-    n = re.sub(r"\s*-\s*(SURGICAL HOME \(Dr\. [A-Za-z]+\)|DESTINATION)$", "", n)
+    """Clinic names as the public should see them, without the owner's own notes: a bracketed note in capitals or one
+    naming a doctor, a drive time or a backup, and an all-capitals tag after a dash."""
+    n = re.sub(r"\s*\((?:[A-Z]{2,}(?: [A-Z]{2,})+|Dr\. [A-Za-z]+|\d+ min from [A-Z][a-z]+|[A-Z][a-z]+ [A-Z]{1,2} backup)\)", "", str(n))
+    n = re.sub(r"\s*-\s*[A-Z]{4,}(?: [A-Z]{4,})*$", "", n)
     return n.strip()
 
 
@@ -1120,14 +1121,28 @@ input#q{flex:1;min-width:160px;background:#1d2430;border:1px solid #3a4356;borde
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{position:sticky;top:0;background:#1a212c;color:#ffd94d;text-align:left;padding:8px 10px;border-bottom:2px solid #2a3140;cursor:pointer}
 td{padding:7px 10px;border-bottom:1px solid #232a36;vertical-align:top}
-tr:hover td{background:#1a212c;cursor:pointer}
+@media(hover:hover){tr:hover td{background:#1a212c;cursor:pointer}}
 .t-ER{color:#ff6b6b;font-weight:700}.t-NIGHT{color:#ffb84d;font-weight:700}.t-EXT{color:#ffd94d}.t-DAY{color:#7fb3ff}.t-UNK{color:#9aa3b2}
 .src{font-size:11px;color:#9aa3b2}
 a{color:#8fc1ff;text-decoration:none}.note{padding:10px 16px;font-size:12.5px;color:#9aa3b2}
 .pop b{font-size:14px}.pop{font-size:13px;line-height:1.45}
-@media(max-width:700px){td:nth-child(7),th:nth-child(7),td:nth-child(10),th:nth-child(10){display:none}}
-</style></head><body>
-<header><h1>__TITLE__</h1><div class="sub">__SUB__</div></header>
+.back{display:none;font-size:13px;color:#8fc1ff;margin-bottom:6px}.in-app .back{display:inline-block}
+.go{display:inline-block;background:#2f6fd6;color:#fff;border-radius:8px;padding:3px 8px;font-size:12px;margin-left:6px}
+body.home .c-off,body.home th.h-off{display:none !important}
+@media(max-width:700px){
+ #tbl thead{display:none}#tbl,#tbl tbody{display:block}
+ #tbl tr{display:flex;flex-wrap:wrap;align-items:baseline;padding:10px 14px;border-bottom:1px solid #2a3140}
+ #tbl td{display:block;padding:1px 0;border:0;font-size:13px}
+ .c-name{order:1;flex:1 1 60%;font-size:15px;font-weight:700;color:#fff}.c-name .src{display:block;font-weight:400;font-size:12.5px;color:#c9ceda}
+ .c-mile{order:2;flex:0 0 auto;margin-left:10px;color:#ffd94d;font-weight:700;white-space:nowrap}body.home .c-mile::after{content:' mi'}body.corridor .c-mile::before{content:'mile ~';font-weight:400;color:#9aa3b2}
+ .c-here{order:3;flex:0 0 100%;color:#ffd94d}.c-here:not(:empty)::before{content:'From you: '}
+ .c-typ{order:4;flex:0 0 100%;font-size:12px}.c-town{order:5;flex:0 0 100%;color:#9aa3b2;font-size:12.5px}#tbl tr.addr .c-town{display:none}#tbl tr.unk .c-typ{display:none}
+ .c-off{order:6;flex:0 0 100%;font-size:12px;color:#9aa3b2}.c-off:not(:empty)::before{content:'Off route: '}
+ .c-hours{order:7;flex:1 1 60%;color:#c9ceda}.c-rating{order:8;flex:0 0 auto;margin-left:10px;color:#9aa3b2}.c-rating:not(:empty)::before{content:'\2605 '}
+ .c-call{order:9;flex:0 0 100%;margin-top:6px}.c-call a{display:inline-block;background:#1f7a4d;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:13px;margin-right:6px}.c-call a.go{background:#2f6fd6;margin-left:0}
+}
+</style></head><body class="__MODE__">
+<header><a class="back" href="./index.html">&larr; MapAVet</a><h1>__TITLE__</h1><div class="sub">__SUB__</div></header>
 <div class="bar">
  <button class="btn on" data-f="ALL">All</button><button class="btn" data-f="ER">24/7 ER</button>
  <button class="btn" data-f="NIGHT">Night / late</button><button class="btn" data-f="EXT">Extended</button>
@@ -1140,17 +1155,21 @@ a{color:#8fc1ff;text-decoration:none}.note{padding:10px 16px;font-size:12.5px;co
  <span><i class="dot" style="background:#ffe14d"></i>extended day</span>
  <span><i class="dot" style="background:#4d9bff"></i>daytime GP</span>
  <span><i class="dot" style="background:#9aa3b2"></i>hours unknown - call</span>
- <span><i class="dot" style="background:#0e1116;border:2px solid #fff;width:9px;height:9px"></i>white ring = hand-verified listing (refreshed from Google when a key is set)</span>
 </div>
 <div id="map"></div>
 <div class="note">__NOTE_TOP__</div>
 <table id="tbl"><thead><tr>
-<th data-s="mile">__MILE_HDR__</th><th data-s="here" class="here" style="display:none">From you</th><th data-s="town">Town</th><th data-s="name">Clinic</th><th data-s="typ">Type</th><th data-s="off">__OFF_HDR__</th><th data-s="hours">Hours</th><th data-s="rating">&#9733;</th><th>Call</th><th data-s="source">Source</th>
+<th data-s="mile">__MILE_HDR__</th><th data-s="here" class="here" style="display:none">From you</th><th data-s="town">Town</th><th data-s="name">Clinic</th><th data-s="typ">Type</th><th data-s="off" class="h-off">Off-route</th><th data-s="hours">Hours</th><th data-s="rating">&#9733;</th><th>Call</th>
 </tr></thead><tbody></tbody></table>
 <div class="note">__NOTE_BOTTOM__</div>
 <script>
 const DATA=__DATA__; const MAIN=__MAIN__; const VAR=__VAR__; const HOME=__HOME__; const RINGS=__RINGS__;
 const col={ER:'#ff5252',NIGHT:'#ffab2e',EXT:'#ffe14d',DAY:'#4d9bff',UNK:'#9aa3b2'};
+const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function dirUrl(c){return IOS?'https://maps.apple.com/?daddr='+c.lat+','+c.lng+'&q='+encodeURIComponent(c.name):'https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng;}
+const IN_APP=/\/map-[a-z0-9]+\.html$/.test(location.pathname);if(IN_APP)document.body.classList.add('in-app');
+const HOMEMODE=document.body.classList.contains('home');
+const TYPE_LABEL={ER:'24/7 ER',NIGHT:'night / late',EXT:'extended hours',DAY:'daytime',UNK:'hours unknown'};
 let map=null,markers={};
 // Basemap tiles: Esri and USGS serve embedded pages (Colab, Streamlit) without a key. OpenStreetMap's own tile
 // server refuses those frames ("Access blocked", 403) and CARTO watermarks them ("API KEY REQUIRED").
@@ -1169,10 +1188,9 @@ if(MAIN.length>1) L.polyline(MAIN,{color:'#6ea8ff',weight:4,opacity:.9}).addTo(m
 if(VAR.length>1) L.polyline(VAR,{color:'#6ea8ff',weight:3,opacity:.8,dashArray:'7 7'}).addTo(map);
 if(HOME){L.marker(HOME.ll).addTo(map).bindPopup('<b>HOME</b><br>'+HOME.label);RINGS.forEach(r=>L.circle(HOME.ll,{radius:r*1609,color:'#6ea8ff',weight:1.5,fill:false,dashArray:'4 6'}).addTo(map));}
 DATA.forEach((c,i)=>{
- const cur=c.source.indexOf('curated')===0;
- const m=L.circleMarker([c.lat,c.lng],{radius:c.typ==='ER'?9:6,color:cur?'#ffffff':'#0e1116',weight:cur?2:1.5,fillColor:col[c.typ],fillOpacity:.95}).addTo(map);
- const gm=c.maps_url||('https://maps.google.com/?q='+c.lat+','+c.lng);
- m.bindPopup('<div class="pop"><b>'+c.name+'</b><br>'+(c.address||c.town)+' &middot; ~mi '+c.mile+' &middot; '+c.off+' mi off route<br><span class="t-'+c.typ+'">'+c.hours+'</span><br>&#9733; '+(c.rating||'&ndash;')+' &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><a target="_blank" href="https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng+'">Directions</a> &middot; <a target="_blank" href="'+gm+'">Open in Google Maps</a>'+(c.website?' &middot; <a target="_blank" href="'+c.website+'">website</a>':'')+'<br><span class="src">source: '+c.source+'</span></div>');
+ const m=L.circleMarker([c.lat,c.lng],{radius:c.typ==='ER'?9:6,color:'#0e1116',weight:1.5,fillColor:col[c.typ],fillOpacity:.95}).addTo(map);
+ const where=HOMEMODE?c.mile+' mi from home':'~mi '+c.mile+' &middot; '+c.off+' mi off route';
+ m.bindPopup('<div class="pop"><b>'+c.name+'</b><br>'+(c.address||c.town)+' &middot; '+where+'<br><span class="t-'+c.typ+'">'+c.hours+'</span><br>&#9733; '+(c.rating||'&ndash;')+' &middot; '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone listed')+'<br><a target="_blank" href="'+dirUrl(c)+'">Directions</a>'+(c.website?' &middot; <a target="_blank" href="'+c.website+'">website</a>':'')+'</div>');
  markers[i]=m;
 });
 }catch(err){document.getElementById('map').innerHTML='<div class="note" style="padding:24px 16px">The map picture needs internet the first time it is opened. Everything below still works: filters, search, tap-to-call and Near me.</div>';}
@@ -1196,9 +1214,9 @@ function render(){
  let rows=DATA.map((c,i)=>({...c,i})).filter(c=>(F==='ALL'||c.typ===F)&&(!Q||(c.town+' '+c.name).toLowerCase().includes(Q)));
  rows.sort((a,b)=>{let x=a[sortK],y=b[sortK];if(typeof x==='string'){x=x.toLowerCase();y=y.toLowerCase()}return (x<y?-1:x>y?1:0)*(sortA?1:-1)});
  rows.forEach(c=>{
-  const tr=document.createElement('tr');
-  tr.innerHTML='<td>'+c.mile+'</td><td class="here" style="display:'+(HERE?'':'none')+'">'+(c.here!=null?c.here.toFixed(1)+' mi':'')+'</td><td>'+c.town+'</td><td>'+c.name+(c.address?'<br><span class="src">'+c.address+'</span>':'')+'</td><td class="t-'+c.typ+'">'+c.typ+'</td><td>'+c.off+' mi</td><td>'+c.hours+'</td><td>'+(c.rating||'&ndash;')+'</td><td>'+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'&ndash;')+'</td><td class="src">'+c.source+'</td>';
-  tr.onclick=()=>{if(map&&markers[c.i]){map.setView([c.lat,c.lng],12);markers[c.i].openPopup();window.scrollTo({top:0,behavior:'smooth'})}};
+  const tr=document.createElement('tr');tr.className=(c.address?'addr ':'')+(c.typ==='UNK'?'unk':'');
+  tr.innerHTML='<td class="c-mile">'+(HOMEMODE?(+c.mile).toFixed(1):c.mile)+'</td><td class="c-here here" style="display:'+(HERE?'':'none')+'">'+(c.here!=null?c.here.toFixed(1)+' mi':'')+'</td><td class="c-town">'+c.town+'</td><td class="c-name">'+c.name+(c.address?'<br><span class="src">'+c.address+'</span>':'')+'</td><td class="c-typ t-'+c.typ+'">'+(TYPE_LABEL[c.typ]||c.typ)+'</td><td class="c-off">'+c.off+' mi</td><td class="c-hours">'+c.hours+'</td><td class="c-rating">'+(c.rating||'')+'</td><td class="c-call">'+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'')+'<a class="go" target="_blank" rel="noopener" href="'+dirUrl(c)+'">Directions</a></td>';
+  tr.onclick=e=>{if(e.target.closest('a'))return;if(map&&markers[c.i]){map.setView([c.lat,c.lng],12);markers[c.i].openPopup();window.scrollTo({top:0,behavior:'smooth'})}};
   tb.appendChild(tr);});
  if(map) DATA.forEach((c,i)=>{const s=(F==='ALL'||c.typ===F)&&(!Q||(c.town+' '+c.name).toLowerCase().includes(Q));
   if(s){markers[i].addTo(map)}else{map.removeLayer(markers[i])}});
@@ -1244,8 +1262,7 @@ def render_html(df, *, title, sub, note_top, note_bottom, route=None, variant=No
            .replace("__MAIN__", json.dumps(_thin(route))).replace("__VAR__", json.dumps(_thin(variant)))
            .replace("__HOME__", json.dumps({"ll": [round(home[0], 5), round(home[1], 5)], "label": _esc(home[2])} if home else None))
            .replace("__RINGS__", json.dumps(list(rings))).replace("__CENTER__", json.dumps(center)).replace("__ZOOM__", str(zoom))
-           .replace("__MILE_HDR__", "Mi from home" if mode == "home" else "~Mile")
-           .replace("__OFF_HDR__", "Distance" if mode == "home" else "Off-route"))
+           .replace("__MILE_HDR__", "Distance" if mode == "home" else "~Mile").replace("__MODE__", mode))
     return out
 
 
@@ -1310,7 +1327,7 @@ def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, g
                 warnings.append(f"town labels incomplete ({e})")
         frames.append(live)
     except RuntimeError as e:
-        warnings.append(f"live {prov.upper()} pull failed ({e}); map shows hand-verified listings only")
+        warnings.append(f"live {prov.upper()} pull failed ({e}); the map shows only the built-in listings")
     df = merge_sources(*frames)
     df = locate_on_route(df, route)
     far_ok = df["typ"].isin(["ER", "NIGHT"]) | ((df["typ"] == "UNK") & df["er_hint"])
@@ -1334,8 +1351,8 @@ def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, g
     if len(gapsnight):
         gap_txt += " <b>No overnight cover at all for:</b> " + "; ".join(f"mi {g['from_mile']}-{g['to_mile']} ({g['gap_mi']} mi)" for _, g in gapsnight.iterrows()) + "."
     note_top = f"<b>Anchor chain (24/7 and night clinics within {corridor_mi} mi of the road):</b> {chain_txt}.{gap_txt}"
-    note_bottom = (f"Hand-verified rows = Google listings Sept 2026; live rows pulled {_stamp()} from {_live_label(prov)}. "
-                   f"Call ahead on holidays. Mile markers and off-route distances are straight-line approximations against the drawn route.")
+    note_bottom = (f"Listings pulled {_stamp()} from {_live_label(prov)}; hours change - call ahead, and on holidays. "
+                   f"Mile markers and off-route distances are straight-line approximations against the drawn route.")
     if warnings:
         note_bottom += " <b>" + "; ".join(_esc(w) for w in warnings) + ".</b>"
     page = render_html(df, title=title, sub=sub, note_top=note_top, note_bottom=note_bottom, route=route, variant=variant)
@@ -1374,7 +1391,7 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
                 warnings.append(f"town labels incomplete ({e})")
         frames.append(live)
     except RuntimeError as e:
-        warnings.append(f"live {prov.upper()} pull failed ({e}); map shows hand-verified listings only")
+        warnings.append(f"live {prov.upper()} pull failed ({e}); the map shows only the built-in listings")
     df = merge_sources(*frames)
     dist = haversine_mi(lat, lng, df["lat"].to_numpy(float), df["lng"].to_numpy(float))
     df["mile"] = np.round(dist, 1); df["off"] = np.round(dist, 1)
@@ -1384,10 +1401,10 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
     er = df[df["typ"] == "ER"].head(3)
     label = label or str(home)
     title = title or f"Home vet network - {label}"
-    sub = f"{len(df)} pins around {_esc(label)} &middot; dashed rings = {' and '.join(str(r) for r in rings)} miles &middot; table sorted by distance from home"
+    sub = f"{len(df)} clinics around {_esc(label)} &middot; dashed rings = {' and '.join(str(r) for r in rings)} miles &middot; sorted by distance"
     note_top = "<b>Closest 24/7 doors:</b> " + (" - ".join(f"{_esc(r['name'])} {_tel(r['phone'])} ({r['off']} mi)" for _, r in er.iterrows()) or "none within reach") + "."
-    note_bottom = (f"Hand-verified rows = Google listings Sept 2026; live rows pulled {_stamp()} from {_live_label(prov)}. "
-                   f"Call ahead on holidays. Distances are straight-line from home.")
+    note_bottom = (f"Listings pulled {_stamp()} from {_live_label(prov)}; hours change - call ahead, and on holidays. "
+                   f"Distances are straight-line from home.")
     if warnings:
         note_bottom += " <b>" + "; ".join(_esc(w) for w in warnings) + ".</b>"
     page = render_html(df, title=title, sub=sub, note_top=note_top, note_bottom=note_bottom, home=(lat, lng, label), rings=rings, mode="home")
@@ -1491,13 +1508,13 @@ async function saveMapHtml(t,fallbackName){
  const l=mmIdx();l.push({id,title:ti,sub:su.replace(/<[^>]+>/g,'').slice(0,120)});mmSave(l);return id;}
 async function removeMap(id){const c=await caches.open('mymaps');await c.delete('./map-'+id+'.html');mmSave(mmIdx().filter(m=>m.id!==id));}
 function listenForMaps(onSaved){window.addEventListener('message',async e=>{const d=e.data;if(!d||d.type!=='vetmap'||typeof d.html!=='string')return;
- if(APP_ORIGIN&&e.origin!==APP_ORIGIN)return;try{const id=await saveMapHtml(d.html,d.name);onSaved&&onSaved(id,mmIdx().slice(-1)[0]);}catch(err){alert('Could not save that map: '+err.message);}});}"""
+ if(APP_ORIGIN&&e.origin!==APP_ORIGIN)return;try{const id=await saveMapHtml(d.html,d.name);onSaved&&onSaved(id,mmIdx().slice(-1)[0],d);}catch(err){alert('Could not save that map: '+err.message);}});}"""
 
 
 def _localize_map(page):
     page = re.sub(r'<link rel="stylesheet" href="[^"]*leaflet[^"]*\.css"/?>', '<link rel="stylesheet" href="./leaflet.css">', page, count=1)
     page = re.sub(r'<script src="[^"]*leaflet[^"]*\.js"></script>', '<script src="./leaflet.js"></script><script src="./leaflet-icons.js"></script>', page, count=1)
-    return page.replace("<header>", '<header><a href="./index.html" style="color:#8fc1ff;font-size:13px;text-decoration:none">&larr; back</a>', 1)
+    return page.replace('class="back"', 'class="back" style="display:inline-block"', 1)
 
 
 _PWA_HEAD = r"""<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -1545,18 +1562,18 @@ td .go{display:inline-block;background:#2f6fd6;color:#fff;border-radius:7px;padd
 _PWA_INDEX = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__</title>__HEAD__<link rel="stylesheet" href="./leaflet.css"></head><body>
 <header><img src="./icon-192.png" alt=""><div><h1>__TITLE__</h1><div class="sub">__SUB__</div></div></header>
 <main>
-<div class="off">No signal - building a new map needs internet. Clinics near me, the built-in list and your saved maps still work.</div>
+<div class="off">No signal - building a new map needs internet. Clinics near me and your saved maps still work.</div>
 <h2>Veterinary clinics near me</h2>
 <div class="seg" id="mode"><button data-m="er" class="on">24/7 ER</button><button data-m="late">Late night</button><button data-m="open">Open now</button></div>
 <button class="btn" id="nearbtn">&#9673; Find clinics near me</button>
 <div class="where"><input id="place" type="search" enterkeyhint="search" autocomplete="off" placeholder="Town, ZIP or address" aria-label="Town, ZIP code or address"><button id="placebtn">Search</button></div>
 <div id="near"></div>
 <div id="nearmap"></div>
-__LIVE__
 __BUILTIN__
+__LIVE__
+<div id="mmsec"><h2>My maps</h2><div id="mymaps"></div><div class="note" id="mmempty">No saved maps yet. Build a map of a route or an address and tap <b>Go to map</b> - it is saved here, on this phone, and opens without signal.</div></div>
 <div id="sponsor"></div>
-<div id="mmsec" style="display:none"><h2>My maps</h2><div id="mymaps"></div></div>
-<div class="status" id="st">Works without signal: clinics near me (anywhere in the US), the built-in list and your saved maps. Needs signal: searching a typed place, building a new map, directions, and map pictures the first time you look at an area. <a href="./install.html" id="howto">Put it on your home screen</a> &middot; <a href="./privacy.html">Privacy</a></div>
+<div class="status" id="st">Works without signal: clinics near me (anywhere in the US) and your saved maps. Needs signal: searching a typed place, building a new map, directions, and map pictures the first time you look at an area. <a href="./install.html" id="howto">Put it on your home screen</a> &middot; <a href="./privacy.html">Privacy</a></div>
 <button class="btn grey" id="installbtn" style="display:none">&#11015; Install this app on your phone</button>
 <h2>Add a map file</h2>
 <label class="btn grey small" for="addmap">+ Add a map file</label><input id="addmap" type="file" accept=".html,text/html" style="display:none">
@@ -1575,7 +1592,7 @@ if(window.matchMedia('(display-mode: standalone)').matches||navigator.standalone
 fetch('./sponsor.json',{cache:'no-store'}).then(r=>r.json()).then(sp=>{if(sp&&sp.enabled&&sp.url){document.getElementById('sponsor').innerHTML='<a class="card" href="'+sp.url+'" target="_blank" rel="noopener sponsored" style="border-color:#3a4356"><b>'+sp.title+'</b><span>'+(sp.text||'')+'</span><span style="display:block;font-size:11px;margin-top:4px;color:#6f7886">Sponsored</span></a>';}}).catch(()=>{});
 function hav(a,b,c,d){const r=Math.PI/180,R=3958.76;const x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
 function renderMine(){const l=mmIdx(),box=document.getElementById('mymaps');box.innerHTML=l.map(m=>'<a class="card" href="./map-'+m.id+'.html"><b>'+m.title+'</b><span>'+m.sub+'</span><button class="rm" data-id="'+m.id+'">remove</button></a>').join('');
- document.getElementById('mmsec').style.display=l.length?'':'none';
+ document.getElementById('mmempty').style.display=l.length?'none':'';
  box.querySelectorAll('.rm').forEach(b=>b.onclick=async e=>{e.preventDefault();await removeMap(b.dataset.id);renderMine();});}
 document.getElementById('addmap').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await saveMapHtml(await f.text(),f.name);renderMine();window.scrollTo({top:document.getElementById('mmsec').offsetTop-10,behavior:'smooth'});}catch(err){alert('That is not a map saved from the map builder.');}e.target.value='';};
 renderMine();listenForMaps(()=>renderMine());
@@ -1602,7 +1619,7 @@ let mode='er',nearMap=null,nearLayer=null,lastPos=null,limit=6;
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;limit=6;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));if(lastPos)showNear(lastPos);});
 function row(c){const typ=c.typ||'UNK',er=typ==='UNK'&&c.er;const badge=er?'ER? call first':({ER:'24/7 ER',NIGHT:'late night',EXT:'extended hrs',DAY:'daytime',UNK:'hours unknown'}[typ]||typ);
  const hrs=c.hours?esc(c.hours):(typ==='UNK'?'Hours not listed - call first':''),tel=String(c.phone||'').replace(/[^0-9+]/g,'');
- const src={verified:'Hand-verified',saved:'From your saved map',osm:'OpenStreetMap listing'}[c.source]||'';
+ const src='';
  return '<div class="res"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>'+esc(c.name)+'</b><span class="badge '+(er?'ERQ':typ)+'">'+badge+'</span></div><span class="d">'+c.d.toFixed(1)+' mi</span></div>'
  +'<div class="addr">'+esc(c.address||c.town||'')+'</div><div class="hrs">'+hrs+(er&&!/call to confirm/i.test(c.hours||'')?'<br>The name suggests emergency care - call to confirm it is open.':'')+'</div>'
  +'<div class="acts">'+(tel?'<a class="act call" href="tel:'+tel+'">'+ICO_CALL+' Call</a>':'<a class="act" target="_blank" rel="noopener" href="https://www.google.com/search?q='+encodeURIComponent(c.name+' '+(c.address||c.town||'')+' phone')+'">'+ICO_FIND+' Find phone</a>')+'<a class="act go" target="_blank" rel="noopener" href="'+dirUrl(c)+'">'+ICO_GO+' Directions</a></div>'
@@ -1620,7 +1637,7 @@ async function showNear(p){lastPos=p;const la=p.la,lo=p.lo,box=document.getEleme
   if(pool.length>top.length)h+='<button class="more" id="more">Show more</button>';
   if(top[0].d>60)h+='<div class="res">The nearest one listed is '+Math.round(top[0].d)+' miles away. Public listings miss some clinics and many hours, so call ahead - and with signal, <a href="./live.html" style="color:#8fc1ff">build a map</a> of your area for a fuller search.</div>';}
  else h+='<div class="res">No '+label+' listed within 500 miles'+(nat.length?'':' (the nationwide list has not downloaded yet - open the app once with signal)')+'. Try another option above, or with signal <a href="./live.html" style="color:#8fc1ff">build a map</a> of your area.</div>';
- h+='<div class="note" style="margin-top:6px">Straight-line miles. '+(mode==='open'?'Clinics whose hours are not listed are left out of Open now, except ones whose name says emergency. ':'')+'Always call before driving - hours change.'+(nat.length?' Clinics outside the hand-verified list: &copy; OpenStreetMap contributors'+(NATDATE?' ('+esc(NATDATE)+')':'')+'.':'')+'</div>';
+ h+='<div class="note" style="margin-top:6px">Straight-line miles. '+(mode==='open'?'Clinics whose hours are not listed are left out of Open now, except ones whose name says emergency. ':'')+'Always call before driving - hours change.'+(nat.length?' Listings &copy; OpenStreetMap contributors'+(NATDATE?' ('+esc(NATDATE)+')':'')+'.':'')+'</div>';
  box.innerHTML=h;const mb=document.getElementById('more');if(mb)mb.onclick=()=>{limit+=6;showNear(lastPos);};
  try{const mapEl=document.getElementById('nearmap');mapEl.style.display='block';
   if(!nearMap){nearMap=L.map('nearmap',{zoomControl:false,attributionControl:false});L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(nearMap);}
@@ -1661,20 +1678,27 @@ try{const v=localStorage.getItem('mapavet.place');if(v)document.getElementById('
 </script></body></html>"""
 
 _PWA_LIVE = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - map builder</title>__HEAD__
-<style>html,body{height:100%}body{display:flex;flex-direction:column}iframe{flex:1 1 auto;border:0;width:100%}
-.bar{padding:8px 16px;background:#151a22;border-bottom:1px solid #2a3140;font-size:13px;line-height:1.5}.bar a{color:#8fc1ff;text-decoration:none}.bar .n{color:#9aa3b2}</style></head>
-<body><div class="bar"><a href="./index.html">&larr; Home</a> &nbsp;&middot;&nbsp; <a href="__APP__" target="_blank">open in browser</a> <span class="n">&nbsp;&middot;&nbsp; If it says the app is asleep, tap <b>Yes, get this app back up</b> and give it 30 seconds.</span></div>
-<div class="off" style="margin:8px 16px">No signal - the builder needs internet. <a href="./index.html" style="color:#ffd94d">Use clinics near me or your saved maps</a>.</div>
-<iframe src="__APP__?embed=true" allow="geolocation; clipboard-write" title="Map builder"></iframe>
-<script>const APP_ORIGIN=__APP_ORIGIN__;</script><script src="./mymaps.js"></script>
+<style>html,body{height:100%}body{display:flex;flex-direction:column;overflow:hidden}
+.bar{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;background:#151a22;border-bottom:1px solid #2a3140;font-size:14px}.bar a{color:#8fc1ff;text-decoration:none;font-weight:600}
+.wrap{flex:1 1 auto;position:relative;overflow:hidden}.wrap iframe{position:absolute;left:0;top:0;width:100%;height:calc(100% + 44px);border:0}
+.fine{padding:4px 14px;background:#151a22;border-top:1px solid #2a3140;color:#6f7886;font-size:10.5px;line-height:1.3}
+.off{margin:8px 16px}body.offline .wrap{display:none}</style></head>
+<body><div class="bar"><a href="./index.html">&larr; Home</a><a href="./index.html#mmsec">My maps</a></div>
+<div class="off">No signal - the builder needs internet. <a href="./index.html" style="color:#ffd94d">Use clinics near me or your saved maps</a>.</div>
+<div class="wrap"><iframe id="fr" src="__APP__?embed=true&app=1" allow="geolocation; clipboard-write" title="Map builder"></iframe></div>
+<div class="fine">If it says the app is asleep, tap "Yes, get this app back up" and give it 30 seconds.</div>
+<script>const APP_ORIGIN=__APP_ORIGIN__,APP_URL=__APP_JSON__;</script><script src="./mymaps.js"></script>
 <script>function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();
-listenForMaps((id,m)=>{const t=document.createElement('div');t.className='toast';t.innerHTML='Saved: <b>'+(m?m.title:'map')+'</b> is under My maps on the <a href="./index.html">home page</a>.';document.body.appendChild(t);setTimeout(()=>t.remove(),8000);});</script>
+function toast(h){const t=document.createElement('div');t.className='toast';t.innerHTML=h;document.body.appendChild(t);setTimeout(()=>t.remove(),8000);}
+listenForMaps((id,m,d)=>{const url='./map-'+id+'.html';
+ if(d&&d.open&&navigator.serviceWorker&&navigator.serviceWorker.controller){location.href=url;return;}
+ toast('Saved: <b>'+(m?m.title:'map')+'</b> - <a href="'+url+'">open it</a> (also under My maps on the <a href="./index.html">home page</a>).');});
+window.addEventListener('message',e=>{const d=e.data;if(!d||d.type!=='vetloc')return;if(APP_ORIGIN&&e.origin!==APP_ORIGIN)return;
+ if(!navigator.geolocation){toast('This phone cannot give a location - type the address instead.');return;}
+ navigator.geolocation.getCurrentPosition(p=>{document.getElementById('fr').src=APP_URL+'?embed=true&app=1&ll='+p.coords.latitude.toFixed(5)+','+p.coords.longitude.toFixed(5);},
+  err=>{toast(err&&err.code===1?'Location is turned off for this app - allow it in your phone settings, or type the address instead.':'Could not get your location right now - type the address instead.');},
+  {enableHighAccuracy:false,timeout:12000,maximumAge:600000});});</script>
 </body></html>"""
-
-_PWA_VERIFIED = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - hand-verified clinics</title>__HEAD__</head>
-<body><header><div><h1>Hand-verified clinics</h1><div class="sub"><a href="./index.html">&larr; back</a> &middot; __N__ clinics checked by hand against their listings (__STAMP__); __NER__ open 24/7 or late. Call before driving - hours change.</div></div></header>
-<main><table><thead><tr><th>Town</th><th>Clinic</th><th>Hours</th><th></th></tr></thead><tbody>__ROWS__</tbody></table></main>
-<script>const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);if(IOS)document.querySelectorAll('a[data-ll]').forEach(a=>{a.href='https://maps.apple.com/?daddr='+a.dataset.ll;});</script></body></html>"""
 
 _PWA_PRIVACY = r"""<!DOCTYPE html><html lang="en"><head><title>__TITLE__ - privacy</title>__HEAD__</head>
 <body><header><div><h1>Privacy</h1><div class="sub"><a href="./index.html">&larr; back</a></div></div></header>
@@ -1874,17 +1898,6 @@ def build_pwa(map_files=(), out_dir="pwa", title="MapAVet", subtitle="", app_url
             rec["sched"] = rec["sched"] if isinstance(rec["sched"], list) else None
             rec["lat"] = round(float(rec["lat"]), 4); rec["lng"] = round(float(rec["lng"]), 4); rows.append(rec)
         (out / "builtin.json").write_text(json.dumps(rows, separators=(",", ":")), encoding="utf-8"); pre.append("./builtin.json")
-        n_er = sum(1 for r in rows if r["typ"] in ("ER", "NIGHT"))
-        trs = "".join(f'<tr><td>{_esc(r["town"])}</td><td><b>{_esc(r["name"])}</b>' + (f'<br><span class="src">{_esc(r["address"])}</span>' if r["address"] else "") + '</td>'
-                      f'<td class="t-{r["typ"]}">{_esc(r["hours"])}</td>'
-                      f'<td style="white-space:nowrap">{("<a href=tel:" + r["phone"] + ">" + r["phone"] + "</a><br>") if r["phone"] else ""}'
-                      f'<a class="go" data-ll="{r["lat"]},{r["lng"]}" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination={r["lat"]},{r["lng"]}">Go</a></td></tr>'
-                      for r in sorted(rows, key=lambda r: (str(r["town"])[-2:], str(r["town"]), r["name"])))
-        (out / "verified.html").write_text(_PWA_VERIFIED.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__N__", str(len(rows)))
-                                           .replace("__NER__", str(n_er)).replace("__STAMP__", _esc(stamp)).replace("__ROWS__", trs), encoding="utf-8"); pre.append("./verified.html")
-        builtin_html = (f'<h2>Built in</h2><a class="card" href="./verified.html"><b>{len(rows)} hand-verified clinics</b>'
-                        f'<span>{n_er} open 24/7 or late. Checked against their listings ({_esc(stamp)}): Denver metro, Denver to Michigan (I-80 / I-69) '
-                        f'and Denver to Houston (I-25 / US-287 / I-45).</span></a>')
         digest.update(json.dumps(rows).encode())
     if nationwide is not None and len(nationwide):
         code = {"ER": "E", "NIGHT": "N", "EXT": "X", "DAY": "D", "UNK": "U"}
@@ -1899,16 +1912,16 @@ def build_pwa(map_files=(), out_dir="pwa", title="MapAVet", subtitle="", app_url
                          r["sched"] if isinstance(r.get("sched"), list) else 0, 1 if r.get("er_hint") else 0])
         nat = json.dumps({"src": "OpenStreetMap contributors (ODbL)", "date": nationwide_stamp, "rows": recs}, separators=(",", ":"), ensure_ascii=False)
         (out / "clinics-us.json").write_text(nat, encoding="utf-8"); pre.append("./clinics-us.json"); digest.update(nat.encode())
-        builtin_html += (f'<div class="note" style="margin-top:-2px">Clinics near me also searches {len(recs):,} clinics across the US from '
-                         f'OpenStreetMap{" (" + _esc(nationwide_stamp) + ")" if nationwide_stamp else ""}, stored on this phone. Many have no hours listed - call first.</div>')
+        builtin_html += (f'<div class="note">Clinics near me searches {len(recs):,} clinics across the US, stored on this phone (OpenStreetMap'
+                         f'{", " + _esc(nationwide_stamp) if nationwide_stamp else ""}). Many have no hours listed - call first.</div>')
     if cards:
         builtin_html = '<h2>Preloaded maps</h2>' + "\n".join(cards) + builtin_html
     live = ""
     if app_url:
         (out / "live.html").write_text(_PWA_LIVE.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__APP__", _esc(app_url.rstrip("/")))
-                                       .replace("__APP_ORIGIN__", app_origin), encoding="utf-8")
+                                       .replace("__APP_ORIGIN__", app_origin).replace("__APP_JSON__", json.dumps(app_url.rstrip("/"))), encoding="utf-8")
         pre.append("./live.html")
-        live = '<h2>Any other area</h2><a class="btn blue" href="./live.html">Build a map of a route or an address</a><div class="note" style="margin-top:-4px">Every clinic along any US drive or around any address, with hours and phone. Needs signal to build; the finished map saves to this phone.</div>'
+        live = '<h2>Any other area</h2><a class="btn blue" href="./live.html">Build a map of a route or an address</a><div class="note" style="margin-top:-4px">Every clinic along any US drive or around any address, with hours and phone. Needs signal to build; the finished map saves to this phone under My maps.</div>'
     (out / "index.html").write_text(_PWA_INDEX.replace("__TITLE__", _esc(title)).replace("__HEAD__", head).replace("__SUB__", subtitle or _esc(slogan))
                                     .replace("__LIVE__", live).replace("__BUILTIN__", builtin_html).replace("__APP_ORIGIN__", app_origin), encoding="utf-8")
     apphost = re.sub(r"^https?://", "", app_url).rstrip("/") if app_url else "the builder"
@@ -1944,9 +1957,9 @@ def build_pwa(map_files=(), out_dir="pwa", title="MapAVet", subtitle="", app_url
         "offers a one-tap Install button where the browser supports it, and shows illustrated Add-to-Home-Screen steps for Safari, Chrome and Samsung Internet. "
         "On a computer it shows a QR code. Pass `site_url` to `build_pwa` so the QR code and link preview point at the right address.\n\n"
         "## Clinics near me\n\nOne button, three choices: 24/7 ER (default), late night, or any clinic open right now (from each clinic's hours and the phone's clock). "
-        "Every result has the address, tap-to-call and a Directions button that opens the phone's own maps app. It uses the built-in hand-verified list, every map saved on the phone "
+        "Every result has the address, tap-to-call and a Directions button that opens the phone's own maps app. It uses the built-in list (`builtin.json`, checked by hand), every map saved on the phone "
         "and `clinics-us.json` (every OpenStreetMap clinic in the US), so it works anywhere and without signal. If the phone cannot give a location, a typed town, ZIP code or address works instead (needs signal).\n\n"
-        "## Saving a map\n\nOpen the builder from inside the app, build the map and tap **Save to this phone** - it appears under My maps. "
+        "## Saving a map\n\nOpen the builder from inside the app, build the map and tap **Go to map** - it is saved under My maps and opens full screen. "
         "**Add a map file** on the home page is for a map built on a computer or sent by someone else. Maps stay on that phone only.\n\n"
         "## Sponsored card\n\n`sponsor.json` controls one sponsored card on the home page: set `enabled` to true and fill in `title`, `text` and `url` "
         "(an affiliate or sponsor link). It is fetched fresh on every online open, so editing the file on the site changes it immediately. "
