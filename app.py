@@ -72,10 +72,10 @@ with st.container(border=True):
         origin = st.text_input("From", "", placeholder="Street address or town, e.g. Denver, CO")
         destination = st.text_input("To", "", placeholder="e.g. Flint, MI")
         custom = st.toggle("Customize route")
-        st.caption("e.g., avoid highways, set checkpoints along the route")
+        st.caption("e.g., avoid highways, add planned stops along the route")
         via_txt = variant_txt = google_link = ""; track_file = None; corridor_mi = 12; er_reach_mi = 45
         if custom:
-            via_txt = st.text_input("Checkpoints along the route (comma-separated towns)", "")
+            via_txt = st.text_input("Planned stops along the route (comma-separated towns)", "")
             variant_txt = st.text_input("Alternative route via (drawn dashed)", "")
             google_link = st.text_input("Google Maps directions link", "",
                                         help="In Google Maps, set the drive up the way you want it (avoid highways, add stops), Share -> Copy link, paste here. Its stops replace From/To.")

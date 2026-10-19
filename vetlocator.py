@@ -1583,7 +1583,8 @@ __LIVE__
 <script>
 function setNet(){document.body.classList.toggle('offline',!navigator.onLine)}
 window.addEventListener('online',setNet);window.addEventListener('offline',setNet);setNet();
-if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').then(()=>{document.getElementById('st').insertAdjacentHTML('afterbegin','<b>Saved on this phone.</b> ')}).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{document.getElementById('st').insertAdjacentHTML('afterbegin','<b>Saved on this phone.</b> ');document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{});});}).catch(()=>{});
+ let hadCtrl=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadCtrl&&!window.__reloaded){window.__reloaded=1;location.reload();}hadCtrl=true;});}
 let deferredInstall=null;const ib=document.getElementById('installbtn');
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;ib.style.display='';});
 ib.onclick=async()=>{if(!deferredInstall)return;ib.disabled=true;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;ib.style.display='none';};
@@ -1649,9 +1650,9 @@ async function showNear(p){lastPos=p;const la=p.la,lo=p.lo,box=document.getEleme
 }
 function locErr(e){const code=e&&e.code;let msg;
  if(code===1)msg=IOS?'Location is turned off for this app. On your iPhone open <b>Settings &rarr; Privacy &amp; Security &rarr; Location Services</b>, make sure it is on, then tap <b>Safari Websites</b> and choose <b>While Using the App</b>. If it is still blocked: <b>Settings &rarr; Safari</b> (or <b>Settings &rarr; Apps &rarr; Safari</b>) &rarr; <b>Location</b> &rarr; <b>Allow</b>. Come back and tap Find clinics near me again.'
-  :'Location is blocked for this app. Allow it in your phone settings (<b>Settings &rarr; Apps &rarr; MapAVet</b> or your browser &rarr; <b>Permissions &rarr; Location</b>), then tap Find clinics near me again.';
+  :'Your phone is refusing to share its location with MapAVet, even though you may have allowed it in one place - Android keeps this setting in two. Check both: <b>Settings &rarr; Apps &rarr; MapAVet &rarr; Permissions &rarr; Location &rarr; Allow only while using the app</b>, and in Chrome <b>&#8942; &rarr; Settings &rarr; Site settings &rarr; Location</b> &rarr; make sure <b>hvarnell.github.io</b> is not under Blocked. Then come back and tap Find clinics near me again.';
  else if(code===3)msg='Your phone is taking too long to find its location (this happens indoors or with a weak GPS signal).';
- else msg='Your phone could not work out where it is right now.';
+ else msg='Your phone could not work out where it is right now. Check that Location is switched on in your phone\'s quick settings.';
  document.getElementById('near').innerHTML='<div class="res">'+msg+'<br><br>Or type a town, ZIP code or address in the box above and tap <b>Search</b>.<div class="note" style="margin-top:6px">(location error '+(code||'?')+(e&&e.message?': '+esc(e.message):'')+')</div></div>';}
 function locate(){document.getElementById('near').innerHTML='<div class="res">Getting your location...</div>';limit=6;
  if(!navigator.geolocation){locErr({code:2,message:'this browser has no location service'});return;}
@@ -1826,14 +1827,14 @@ else if(inApp){const w=document.getElementById('inapp');w.hidden=false;
  else if(isIOS){w.innerHTML='<b>You are inside '+appLabel+'\'s own browser</b>, which cannot save apps to the home screen.<a class="btn" href="x-safari-'+here+'">Open this page in Safari</a>If nothing happens: tap &bull;&bull;&bull; in the corner, then <b>Open in Safari</b> (or Open in external browser), and follow the steps below there.';}
  else{w.innerHTML='<b>You are inside '+appLabel+'\'s own browser.</b> Open this page in Safari or Chrome to save it: tap the menu in the corner and choose <b>Open in browser</b>.';}}
 let deferredInstall=null;const ib=document.getElementById('installbtn');
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;if(!standalone&&!inApp)ib.hidden=false;});
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;if(!standalone&&!inApp&&document.getElementById('done').hidden)ib.hidden=false;});
 ib.onclick=async()=>{if(!deferredInstall)return;ib.disabled=true;deferredInstall.prompt();const r=await deferredInstall.userChoice;deferredInstall=null;ib.hidden=true;ib.disabled=false;if(r&&r.outcome==='accepted'){document.getElementById('done').hidden=false;}};
 window.addEventListener('appinstalled',()=>{ib.hidden=true;document.getElementById('done').hidden=false;});
-if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(()=>{});}
 </script></body></html>"""
 
 _PWA_SW = r"""const VERSION='__VERSION__';const PRECACHE=__PRECACHE__;
-self.addEventListener('install',e=>{e.waitUntil(caches.open('vet-'+VERSION).then(c=>Promise.allSettled(PRECACHE.map(u=>c.add(u)))).then(()=>self.skipWaiting()))});
+self.addEventListener('install',e=>{e.waitUntil(caches.open('vet-'+VERSION).then(c=>Promise.allSettled(PRECACHE.map(u=>c.add(new Request(u,{cache:'reload'}))))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!=='vet-'+VERSION&&k!=='tiles'&&k!=='mymaps').map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 async function trim(c){const keys=await c.keys();if(keys.length>2500){for(const k of keys.slice(0,300))await c.delete(k);}}
 self.addEventListener('fetch',e=>{
