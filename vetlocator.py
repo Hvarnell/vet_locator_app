@@ -756,6 +756,8 @@ def overpass(query_body, timeout=60):
     for url in OVERPASS_URLS:
         try:
             j = _get_json(url, data={"data": q}, method="POST", timeout=timeout + 15, tries=1)
+            if "elements" not in j or ("remark" in j and re.search(r"error|timed out|timeout", str(j["remark"]), re.I)):
+                raise RuntimeError(f"{url.split('/')[2]}: {str(j.get('remark', 'no elements'))[:100]}")
             p.write_text(json.dumps(j)); return j
         except RuntimeError as e:
             last = e
@@ -771,9 +773,10 @@ def osm_places(boxes):
         for el in j["elements"]:
             t = el.get("tags", {})
             if t.get("name"):
+                pop = re.sub(r"\D", "", str(t.get("population") or ""))
                 rows.append({"lat": el["lat"], "lng": el["lon"], "place": t["name"], "kind": t["place"],
-                             "state": t.get("addr:state") or t.get("is_in:state_code") or ""})
-    return pd.DataFrame(rows).drop_duplicates(["place", "lat", "lng"]) if rows else pd.DataFrame(columns=["lat", "lng", "place", "kind", "state"])
+                             "state": t.get("addr:state") or t.get("is_in:state_code") or "", "pop": int(pop) if pop else 0})
+    return pd.DataFrame(rows).drop_duplicates(["place", "lat", "lng"]) if rows else pd.DataFrame(columns=["lat", "lng", "place", "kind", "state", "pop"])
 
 
 def fetch_osm(boxes):
@@ -1010,6 +1013,111 @@ def _centers_along(route, step_mi):
     return list(zip(np.interp(target, route["cum_mi"], route["lat"]), np.interp(target, route["cum_mi"], route["lng"])))
 
 
+
+# ---------------------------------------------------------------- places to stay with a dog
+# Hotel chains whose published policy welcomes dogs at (nearly) every location, and chains where it depends on the
+# location.  Fees, size limits and pet rooms vary everywhere, so every row says to call ahead.
+PET_CHAINS_YES = ("motel 6", "studio 6", "red roof", "la quinta", "kimpton", "drury", "aloft", "element by", "element hotel",
+                  "home2", "homewood", "residence inn", "towneplace", "candlewood", "staybridge", "extended stay",
+                  "sonesta es", "sonesta simply", "hyatt house", "hyatt place", "loews", "virgin hotel", "canopy by hilton")
+PET_CHAINS_OFTEN = ("best western", "comfort inn", "comfort suites", "quality inn", "sleep inn", "clarion", "mainstay",
+                    "holiday inn", "hampton", "hilton garden", "days inn", "super 8", "baymont", "travelodge", "microtel",
+                    "wingate", "fairfield", "springhill", "courtyard", "doubletree", "embassy suites", "ramada", "econo lodge",
+                    "rodeway", "americas best value", "country inn", "americinn", "cobblestone", "my place hotel", "woodspring",
+                    "tru by hilton", "avid hotel", "la quinta", "red lion", "motel 6", "wyndham", "sheraton", "westin", "marriott",
+                    "hilton", "hyatt", "radisson", "crowne plaza", "four points", "surestay", "quality suites")
+_PET_YES_TAGS = {"yes", "leashed", "allowed", "permitted"}
+
+
+def _pet_policy(t):
+    """('yes'|'often'|None, note) from OSM tags and the chain name."""
+    if (t.get("dog") or t.get("pets") or t.get("pets_allowed") or t.get("dogs") or "").lower() in _PET_YES_TAGS:
+        return "yes", "listed as dog-friendly - call ahead for fees and limits"
+    if (t.get("dog") or t.get("pets") or "").lower() == "no":
+        return None, ""
+    n = (t.get("name") or t.get("brand") or "").lower()
+    if any(c in n for c in PET_CHAINS_YES):
+        return "yes", "chain welcomes dogs - call ahead for fees and limits"
+    if any(c in n for c in PET_CHAINS_OFTEN):
+        return "often", "many of this chain's locations take dogs - call ahead"
+    return None, ""
+
+
+def _lodging_query(bb):
+    return (f'(nwr["tourism"~"^(hotel|motel)$"]["name"]{bb};nwr["tourism"]["name"]["dog"~"^(yes|leashed)$"]{bb};'
+            f'nwr["tourism"]["name"]["pets"~"^(yes|allowed)$"]{bb};);out center tags;')
+
+
+def fetch_osm_lodging(route=None, center=None, radius_mi=6.0):
+    """Dog-friendly places to stay from OpenStreetMap: named hotels and motels (plus anything tagged dog/pets=yes)
+    in boxes along the route or around a point, kept when the chain or the tags welcome dogs.  Callers trim to the
+    corridor; a box that fails is skipped and listed in .attrs['failed']."""
+    boxes = _bboxes_along(route, chunk_mi=150, margin_mi=radius_mi + 2) if route is not None else [_bbox_around(center[0], center[1], radius_mi)]
+    els, failed = {}, []
+    for k, (s, w, n, e) in enumerate(boxes):
+        try:
+            for el in overpass(_lodging_query(f"({s:.4f},{w:.4f},{n:.4f},{e:.4f})"), timeout=60)["elements"]:
+                els[(el["type"], el["id"])] = el
+        except RuntimeError:
+            failed.append(k)
+    rows = []
+    for (typ_, oid), el in els.items():
+        t = el.get("tags", {})
+        pol, note = _pet_policy(t)
+        if not pol:
+            continue
+        lat = el.get("lat") or el.get("center", {}).get("lat"); lng = el.get("lon") or el.get("center", {}).get("lon")
+        if lat is None:
+            continue
+        city = t.get("addr:city") or ""
+        rows.append({"name": t.get("name", ""), "kind": t.get("tourism", "hotel"), "lat": float(lat), "lng": float(lng),
+                     "town": (city + (f" {t['addr:state']}" if city and t.get("addr:state") else "")).strip(),
+                     "phone": _fmt_phone(t.get("phone") or t.get("contact:phone")),
+                     "website": t.get("website") or t.get("contact:website") or "", "pet": pol, "note": note, "ext_id": f"{typ_}/{oid}"})
+    df = pd.DataFrame(rows, columns=["name", "kind", "lat", "lng", "town", "phone", "website", "pet", "note", "ext_id"])
+    df.attrs["failed"] = failed
+    return df
+
+
+def state_of(lat, lng):
+    """Two-letter state for a point (optional reverse_geocode package; '' without it)."""
+    try:
+        import reverse_geocode
+        r = reverse_geocode.search([(float(lat), float(lng))])[0]
+        return _STATE_ABBR.get(str(r.get("state", "")).lower(), "") if r.get("country_code") == "US" else ""
+    except Exception:
+        return ""
+
+
+def _town_slug(place, state):
+    return re.sub(r"[^A-Za-z0-9]+", "-", f"{place} {state}".strip()).strip("-")
+
+
+def rental_links(place, state):
+    """Search links with the pets filter set where the site supports it; the stays are not checked for availability."""
+    q = f"{place}, {state}".strip(", ")
+    from urllib.parse import quote
+    return {"airbnb": f"https://www.airbnb.com/s/{_town_slug(place, state)}--United-States/homes?pets=1&adults=2",
+            "vrbo": f"https://www.vrbo.com/search?destination={quote(q)}&petsIncluded=true&adults=2",
+            "hotels": f"https://www.google.com/maps/search/{quote('pet friendly hotels near ' + q)}"}
+
+
+def route_towns(places, route, every_mi=50, max_off_mi=10):
+    """One town per stretch of the route for the rental links: the biggest place (city > town > village, then
+    population) within max_off_mi of the road in each every_mi window, plus the first and last stretch."""
+    if places is None or places.empty:
+        return pd.DataFrame(columns=["place", "state", "lat", "lng", "mile", "off", "kind", "pop"])
+    pl = locate_on_route(places, route)
+    pl = pl[pl["off"] <= max_off_mi].copy()
+    if pl.empty:
+        return pl
+    rank = {"city": 3, "town": 2, "village": 1}
+    pl["score"] = pl["kind"].map(rank).fillna(0) * 10_000_000 + pl["pop"].fillna(0)
+    pl["win"] = (pl["mile"] // every_mi).astype(int)
+    best = pl.sort_values("score", ascending=False).drop_duplicates("win").sort_values("mile")
+    return best[["place", "state", "lat", "lng", "mile", "off", "kind", "pop"]].reset_index(drop=True)
+
+
 # vetlocator | 6 merge
 def _norm(s):
     s = re.sub(r"[^a-z0-9 ]", " ", str(s).lower())
@@ -1128,25 +1236,28 @@ a{color:#8fc1ff;text-decoration:none}.note{padding:10px 16px;font-size:12.5px;co
 .pop b{font-size:14px}.pop{font-size:13px;line-height:1.45}
 .back{display:none;font-size:13px;color:#8fc1ff;margin-bottom:6px}.in-app .back{display:inline-block}
 .go{display:inline-block;background:#2f6fd6;color:#fff;border-radius:8px;padding:3px 8px;font-size:12px;margin-left:6px}
+.lk{display:inline-block;background:#3b2f63;border:1px solid #6f58b8;color:#e4dcff;border-radius:8px;padding:3px 8px;font-size:12px;margin:2px 6px 2px 0;text-decoration:none}
+h2.sec{font-size:15px;color:#c9b8ff;margin:18px 16px 6px}.stays-off #staysec{display:none}
+.t-STAY{color:#c9b8ff;font-weight:600}.t-RENT{color:#9aa3b2}
 body.home .c-off,body.home th.h-off{display:none !important}
 @media(max-width:700px){
- #tbl thead{display:none}#tbl,#tbl tbody{display:block}
- #tbl tr{display:flex;flex-wrap:wrap;align-items:baseline;padding:10px 14px;border-bottom:1px solid #2a3140}
- #tbl td{display:block;padding:1px 0;border:0;font-size:13px}
+ #tbl thead,#stays thead{display:none}#tbl,#tbl tbody,#stays,#stays tbody{display:block}
+ #tbl tr,#stays tr{display:flex;flex-wrap:wrap;align-items:baseline;padding:10px 14px;border-bottom:1px solid #2a3140}
+ #tbl td,#stays td{display:block;padding:1px 0;border:0;font-size:13px}
  .c-name{order:1;flex:1 1 60%;font-size:15px;font-weight:700;color:#fff}.c-name .src{display:block;font-weight:400;font-size:12.5px;color:#c9ceda}
  .c-mile{order:2;flex:0 0 auto;margin-left:10px;color:#ffd94d;font-weight:700;white-space:nowrap}body.home .c-mile::after{content:' mi'}body.corridor .c-mile::before{content:'mile ~';font-weight:400;color:#9aa3b2}
  .c-here{order:3;flex:0 0 100%;color:#ffd94d}.c-here:not(:empty)::before{content:'From you: '}
- .c-typ{order:4;flex:0 0 100%;font-size:12px}.c-town{order:5;flex:0 0 100%;color:#9aa3b2;font-size:12.5px}#tbl tr.addr .c-town{display:none}#tbl tr.unk .c-typ{display:none}
+ .c-typ{order:4;flex:0 0 100%;font-size:12px}.c-town{order:5;flex:0 0 100%;color:#9aa3b2;font-size:12.5px}#tbl tr.addr .c-town{display:none}#tbl tr.unk .c-typ{display:none}#stays tr.rent .c-town{display:none}
  .c-off{order:6;flex:0 0 100%;font-size:12px;color:#9aa3b2}.c-off:not(:empty)::before{content:'Off route: '}
  .c-hours{order:7;flex:1 1 60%;color:#c9ceda}.c-rating{order:8;flex:0 0 auto;margin-left:10px;color:#9aa3b2}.c-rating:not(:empty)::before{content:'\2605 '}
- .c-call{order:9;flex:0 0 100%;margin-top:6px}.c-call a{display:inline-block;background:#1f7a4d;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:13px;margin-right:6px}.c-call a.go{background:#2f6fd6;margin-left:0}
+ .c-call{order:9;flex:0 0 100%;margin-top:6px}.c-call a{display:inline-block;background:#1f7a4d;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:13px;margin-right:6px}.c-call a.go{background:#2f6fd6;margin-left:0}.c-call a.lk{background:#3b2f63;border:1px solid #6f58b8;color:#e4dcff;margin:3px 6px 3px 0}
 }
 </style></head><body class="__MODE__">
 <header><a class="back" href="./index.html">&larr; MapAVet</a><h1>__TITLE__</h1><div class="sub">__SUB__</div></header>
 <div class="bar">
  <button class="btn on" data-f="ALL">All</button><button class="btn" data-f="ER">24/7 ER</button>
  <button class="btn" data-f="NIGHT">Night / late</button><button class="btn" data-f="EXT">Extended</button>
- <button class="btn" data-f="DAY">Daytime</button><button class="btn" data-f="UNK">Unknown hrs</button><input id="q" placeholder="search town or clinic..."><button class="btn" id="near" title="Sort every clinic by distance from where you are right now">&#9673; Near me</button>
+ <button class="btn" data-f="DAY">Daytime</button><button class="btn" data-f="UNK">Unknown hrs</button><input id="q" placeholder="search town or clinic..."><button class="btn" id="near" title="Sort every clinic by distance from where you are right now">&#9673; Near me</button><button class="btn on" id="staysbtn" title="Dog-friendly hotels and rental searches along the way">&#128054; Stays</button>
 </div>
 <div class="note" id="nearbox" style="display:none"></div>
 <div class="bar legend">
@@ -1155,22 +1266,29 @@ body.home .c-off,body.home th.h-off{display:none !important}
  <span><i class="dot" style="background:#ffe14d"></i>extended day</span>
  <span><i class="dot" style="background:#4d9bff"></i>daytime GP</span>
  <span><i class="dot" style="background:#9aa3b2"></i>hours unknown - call</span>
+ <span><i class="dot" style="background:#b48cff;border:2px solid #fff;width:9px;height:9px"></i>dog-friendly hotel / motel</span>
+ <span><i class="dot" style="background:transparent;border:2px solid #b48cff;width:9px;height:9px"></i>town with pet-friendly rental searches</span>
 </div>
 <div id="map"></div>
 <div class="note">__NOTE_TOP__</div>
 <table id="tbl"><thead><tr>
 <th data-s="mile">__MILE_HDR__</th><th data-s="here" class="here" style="display:none">From you</th><th data-s="town">Town</th><th data-s="name">Clinic</th><th data-s="typ">Type</th><th data-s="off" class="h-off">Off-route</th><th data-s="hours">Hours</th><th data-s="rating">&#9733;</th><th>Call</th>
 </tr></thead><tbody></tbody></table>
+<div id="staysec"><h2 class="sec">&#128054; Places to stay with your dog</h2>
+<div class="note" style="padding-top:0">Hotels and motels near the road whose chain welcomes dogs, and for each stretch of the drive a search for pet-friendly Airbnb, VRBO and hotel stays. Nothing here is checked for availability - tap a link to check. Always confirm the pet policy and fees when you book.</div>
+<table id="stays"><thead><tr><th data-s="mile">__MILE_HDR__</th><th data-s="here" class="here" style="display:none">From you</th><th data-s="town">Town</th><th data-s="name">Stay</th><th>Check / book</th></tr></thead><tbody></tbody></table></div>
 <div class="note">__NOTE_BOTTOM__</div>
 <script>
-const DATA=__DATA__; const MAIN=__MAIN__; const VAR=__VAR__; const HOME=__HOME__; const RINGS=__RINGS__;
+const DATA=__DATA__; const MAIN=__MAIN__; const VAR=__VAR__; const HOME=__HOME__; const RINGS=__RINGS__; const STAYS=__STAYS__;
 const col={ER:'#ff5252',NIGHT:'#ffab2e',EXT:'#ffe14d',DAY:'#4d9bff',UNK:'#9aa3b2'};
 const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 function dirUrl(c){return IOS?'https://maps.apple.com/?daddr='+c.lat+','+c.lng+'&q='+encodeURIComponent(c.name):'https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng;}
 const IN_APP=/\/map-[a-z0-9]+\.html$/.test(location.pathname);if(IN_APP)document.body.classList.add('in-app');
 const HOMEMODE=document.body.classList.contains('home');
 const TYPE_LABEL={ER:'24/7 ER',NIGHT:'night / late',EXT:'extended hours',DAY:'daytime',UNK:'hours unknown'};
-let map=null,markers={};
+let map=null,markers={},stayLayer=null;
+function stayLinks(s){if(s.k==='rentals')return '<a class="lk" target="_blank" rel="noopener" href="'+s.links.airbnb+'">Airbnb</a><a class="lk" target="_blank" rel="noopener" href="'+s.links.vrbo+'">VRBO</a><a class="lk" target="_blank" rel="noopener" href="'+s.links.hotels+'">Hotels</a>';
+ return (s.phone?'<a class="lk" href="tel:'+s.phone.replace(/[^0-9+]/g,'')+'">Call '+s.phone+'</a>':'')+(s.website?'<a class="lk" target="_blank" rel="noopener" href="'+s.website+'">Website</a>':'')+'<a class="lk" target="_blank" rel="noopener" href="'+dirUrl(s)+'">Directions</a>';}
 // Basemap tiles: Esri and USGS serve embedded pages (Colab, Streamlit) without a key. OpenStreetMap's own tile
 // server refuses those frames ("Access blocked", 403) and CARTO watermarks them ("API KEY REQUIRED").
 // If the map engine cannot load (saved page opened with no signal), the table, filters and tap-to-call still work.
@@ -1187,6 +1305,10 @@ L.control.layers(BASEMAPS,null,{position:'topright'}).addTo(map);
 if(MAIN.length>1) L.polyline(MAIN,{color:'#6ea8ff',weight:4,opacity:.9}).addTo(map);
 if(VAR.length>1) L.polyline(VAR,{color:'#6ea8ff',weight:3,opacity:.8,dashArray:'7 7'}).addTo(map);
 if(HOME){L.marker(HOME.ll).addTo(map).bindPopup('<b>HOME</b><br>'+HOME.label);RINGS.forEach(r=>L.circle(HOME.ll,{radius:r*1609,color:'#6ea8ff',weight:1.5,fill:false,dashArray:'4 6'}).addTo(map));}
+stayLayer=L.layerGroup().addTo(map);
+STAYS.forEach(s=>{const isR=s.k==='rentals';
+ const m=isR?L.circleMarker([s.lat,s.lng],{radius:7,color:'#b48cff',weight:2,fill:false}):L.circleMarker([s.lat,s.lng],{radius:4,color:'#fff',weight:1,fillColor:'#b48cff',fillOpacity:.9});
+ m.bindPopup('<div class="pop"><b>'+s.name+'</b><br>'+(s.town||'')+(HOMEMODE?' &middot; '+s.mile+' mi from home':' &middot; ~mi '+s.mile)+'<br>'+stayLinks(s)+'</div>');m.addTo(stayLayer);});
 DATA.forEach((c,i)=>{
  const m=L.circleMarker([c.lat,c.lng],{radius:c.typ==='ER'?9:6,color:'#0e1116',weight:1.5,fillColor:col[c.typ],fillOpacity:.95}).addTo(map);
  const where=HOMEMODE?c.mile+' mi from home':'~mi '+c.mile+' &middot; '+c.off+' mi off route';
@@ -1200,15 +1322,23 @@ document.getElementById('near').onclick=()=>{
  if(!navigator.geolocation){alert('This browser cannot give a location. Open the map in the phone\'s browser or as the home-screen app.');return;}
  navigator.geolocation.getCurrentPosition(p=>{
   HERE=[p.coords.latitude,p.coords.longitude];
-  DATA.forEach(c=>{c.here=hav(HERE[0],HERE[1],c.lat,c.lng)});
+  DATA.forEach(c=>{c.here=hav(HERE[0],HERE[1],c.lat,c.lng)});STAYS.forEach(s=>{s.here=hav(HERE[0],HERE[1],s.lat,s.lng)});
   if(map){if(youMarker)map.removeLayer(youMarker);youMarker=L.marker(HERE).addTo(map).bindPopup('<b>You are here</b>');map.setView(HERE,10);}
-  const ers=DATA.filter(c=>c.typ==='ER'||c.typ==='NIGHT').sort((a,b)=>a.here-b.here).slice(0,3);
+  const ERN=/emergenc|\b24[\s/-]*(7|h|hr|hour)|urgent|after[\s-]*hours|\bER\b|critical care|\bmedvet\b|blue ?pearl|\bVEG\b/i;
+  const ers=DATA.filter(c=>c.typ==='ER'||c.typ==='NIGHT'||(c.typ==='UNK'&&ERN.test(c.name))).sort((a,b)=>a.here-b.here).slice(0,3);
   const nb=document.getElementById('nearbox');nb.style.display='';
-  nb.innerHTML='<b>Nearest overnight doors from where you are:</b> '+(ers.map(c=>c.name+' '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone')+' ('+c.here.toFixed(1)+' mi straight-line, <span class="t-'+c.typ+'">'+c.typ+'</span>)').join(' - ')||'none in this map')+'. Table is now sorted by distance from you.';
+  nb.innerHTML='<b>Nearest overnight doors from where you are:</b> '+(ers.map(c=>c.name+' '+(c.phone?'<a href="tel:'+c.phone+'">'+c.phone+'</a>':'no phone')+' ('+c.here.toFixed(1)+' mi straight-line, <span class="t-'+c.typ+'">'+(c.typ==='UNK'?'ER? call first':c.typ)+'</span>)').join(' - ')||'none in this map')+'. Table is now sorted by distance from you.';
   document.querySelectorAll('.here').forEach(e=>e.style.display='');
-  sortK='here';sortA=true;render();
+  sortK='here';sortA=true;render();renderStays();
  },()=>alert('Location unavailable - allow location access for this page and try again.'),{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
 };
+function renderStays(){const tb=document.querySelector('#stays tbody');if(!tb)return;tb.innerHTML='';
+ const rows=STAYS.slice().sort((a,b)=>(HERE?(a.here-b.here):(a.mile-b.mile))||a.off-b.off);
+ rows.forEach(s=>{const tr=document.createElement('tr');tr.className=(s.k==='rentals'?'rent':'stay')+(s.town?' addr':'');
+  const sub=s.k==='rentals'?'searches with the pets filter set - not checked for availability':(s.kind==='motel'?'Motel':'Hotel')+' - '+s.note;
+  tr.innerHTML='<td class="c-mile">'+(HOMEMODE?(+s.mile).toFixed(1):s.mile)+'</td><td class="c-here here" style="display:'+(HERE?'':'none')+'">'+(s.here!=null?s.here.toFixed(1)+' mi':'')+'</td><td class="c-town">'+(s.town||'')+'</td><td class="c-name">'+s.name+'<br><span class="src">'+sub+'</span></td><td class="c-call">'+stayLinks(s)+'</td>';
+  tr.onclick=e=>{if(e.target.closest('a'))return;if(map){map.setView([s.lat,s.lng],11);window.scrollTo({top:0,behavior:'smooth'})}};
+  tb.appendChild(tr);});}
 function render(){
  const tb=document.querySelector('#tbl tbody'); tb.innerHTML='';
  let rows=DATA.map((c,i)=>({...c,i})).filter(c=>(F==='ALL'||c.typ===F)&&(!Q||(c.town+' '+c.name).toLowerCase().includes(Q)));
@@ -1223,8 +1353,10 @@ function render(){
 }
 document.querySelectorAll('.btn[data-f]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.btn[data-f]').forEach(x=>x.classList.remove('on'));b.classList.add('on');F=b.dataset.f;render()});
 document.getElementById('q').oninput=e=>{Q=e.target.value.toLowerCase();render()};
-document.querySelectorAll('th[data-s]').forEach(h=>h.onclick=()=>{const k=h.dataset.s;if(sortK===k)sortA=!sortA;else{sortK=k;sortA=true}render()});
-render();
+document.querySelectorAll('#tbl th[data-s]').forEach(h=>h.onclick=()=>{const k=h.dataset.s;if(sortK===k)sortA=!sortA;else{sortK=k;sortA=true}render()});
+const sb=document.getElementById('staysbtn');if(!STAYS.length){sb.style.display='none';document.getElementById('staysec').style.display='none';}
+sb.onclick=()=>{const on=!sb.classList.contains('on');sb.classList.toggle('on',on);document.body.classList.toggle('stays-off',!on);if(map&&stayLayer){on?stayLayer.addTo(map):map.removeLayer(stayLayer);}};
+render();renderStays();
 </script></body></html>"""
 
 
@@ -1240,7 +1372,7 @@ def _thin(route, n=200):
     return [[round(float(route["lat"][i]), 4), round(float(route["lng"][i]), 4)] for i in idx]
 
 
-def render_html(df, *, title, sub, note_top, note_bottom, route=None, variant=None, home=None, rings=(5, 15), mode="corridor"):
+def render_html(df, *, title, sub, note_top, note_bottom, route=None, variant=None, home=None, rings=(5, 15), mode="corridor", stays=None):
     """Fills the Leaflet template with the clinic table, route line(s) and notes -> one self-contained HTML string."""
     cols = ["name", "town", "address", "lat", "lng", "phone", "hours", "typ", "rating", "off", "mile", "source", "website", "maps_url", "sched"]
     recs = []
@@ -1262,7 +1394,8 @@ def render_html(df, *, title, sub, note_top, note_bottom, route=None, variant=No
            .replace("__MAIN__", json.dumps(_thin(route))).replace("__VAR__", json.dumps(_thin(variant)))
            .replace("__HOME__", json.dumps({"ll": [round(home[0], 5), round(home[1], 5)], "label": _esc(home[2])} if home else None))
            .replace("__RINGS__", json.dumps(list(rings))).replace("__CENTER__", json.dumps(center)).replace("__ZOOM__", str(zoom))
-           .replace("__MILE_HDR__", "Distance" if mode == "home" else "~Mile").replace("__MODE__", mode))
+           .replace("__MILE_HDR__", "Distance" if mode == "home" else "~Mile").replace("__MODE__", mode)
+           .replace("__STAYS__", json.dumps([{k: (_esc(v) if isinstance(v, str) and k not in ("links", "website") else v) for k, v in r.items()} for r in (stays or [])], separators=(",", ":"))))
     return out
 
 
@@ -1283,6 +1416,66 @@ def _tel(p):
 
 def _live_label(prov):
     return "Google Places" if prov == "google" else "OpenStreetMap (no ratings; hours where mapped)"
+
+
+def build_stays(route=None, center=None, places=None, radius_mi=6, every_mi=50, warnings=None):
+    """Places to stay with a dog, as plain dicts for the map: hotels and motels near the road (or around the
+    address) whose chain or OSM tags welcome dogs, plus one 'rentals near <town>' entry per stretch of the route
+    with Airbnb and VRBO searches (pets filter set) and a pet-friendly-hotels map search.  Nothing is checked
+    for availability - the links are there to check.  Never fatal: a failed lookup leaves a warning."""
+    rows = []
+    try:
+        lodging = fetch_osm_lodging(route=route, center=center, radius_mi=radius_mi)
+        if lodging.attrs.get("failed") and warnings is not None:
+            warnings.append("places to stay: OpenStreetMap did not answer for part of the route - re-run later to fill them")
+    except Exception as e:
+        if warnings is not None:
+            warnings.append(f"places to stay unavailable ({e})")
+        lodging = pd.DataFrame()
+    if len(lodging):
+        if route is not None:
+            lodging = locate_on_route(lodging, route)
+            lodging = lodging[lodging["off"] <= radius_mi]
+        else:
+            d = np.round(haversine_mi(center[0], center[1], lodging["lat"].to_numpy(float), lodging["lng"].to_numpy(float)), 1)
+            lodging = lodging.assign(mile=d, off=d)
+            lodging = lodging[lodging["off"] <= radius_mi]
+        if places is not None and len(places):
+            lodging = fill_towns(lodging, places)
+        lodging = lodging.assign(_key=lodging["name"].str.lower().str.replace(r"[^a-z0-9]", "", regex=True) + lodging["lat"].round(2).astype(str) + lodging["lng"].round(2).astype(str)).drop_duplicates("_key")
+        lodging = lodging.assign(_rank=(lodging["pet"] != "yes").astype(int)).sort_values(["_rank", "off"])
+        if route is None:                                # a city has hundreds: the nearest 40, chain-policy ones first
+            lodging = lodging.head(40)
+        else:                                            # a metro has hundreds too: up to 4 per 25-mile stretch, chain-policy ones first
+            lodging = lodging.assign(_win=(lodging["mile"] // 25)).groupby("_win", group_keys=False).head(4)
+        lodging = lodging.sort_values(["mile", "off"])
+        for r in lodging.to_dict("records"):
+            rows.append({"k": "stay", "name": r["name"], "kind": r["kind"], "note": r["note"], "pet": r["pet"], "lat": round(r["lat"], 4), "lng": round(r["lng"], 4),
+                         "mile": float(r["mile"]) if route is None else int(r["mile"]), "off": float(r["off"]), "town": r.get("town") or "",
+                         "phone": r.get("phone") or "", "website": r.get("website") or ""})
+    if route is not None:
+        towns = route_towns(places, route, every_mi=every_mi) if places is not None else pd.DataFrame()
+        for t in towns.to_dict("records"):
+            st = t.get("state") or state_of(t["lat"], t["lng"])
+            rows.append({"k": "rentals", "name": f"Pet-friendly rentals and hotels near {t['place']}", "town": f"{t['place']} {st}".strip(), "lat": round(t["lat"], 4),
+                         "lng": round(t["lng"], 4), "mile": int(t["mile"]), "off": float(t["off"]), "links": rental_links(t["place"], st)})
+    else:
+        place, st, lat0, lng0 = "", "", center[0], center[1]
+        if places is not None and len(places):
+            d = haversine_mi(center[0], center[1], places["lat"].to_numpy(float), places["lng"].to_numpy(float))
+            big = places[places["kind"].isin(["city", "town"])]
+            if len(big):
+                db = haversine_mi(center[0], center[1], big["lat"].to_numpy(float), big["lng"].to_numpy(float))
+                r = big.iloc[int(db.argmin())]
+            else:
+                r = places.iloc[int(d.argmin())]
+            place, st, lat0, lng0 = r["place"], r.get("state") or "", float(r["lat"]), float(r["lng"])
+        if place:
+            st = st or state_of(lat0, lng0)
+            rows.append({"k": "rentals", "name": f"Pet-friendly rentals and hotels near {place}", "town": f"{place} {st}".strip(), "lat": round(lat0, 4),
+                         "lng": round(lng0, 4), "mile": 0.0, "off": 0.0, "links": rental_links(place, st)})
+    rows.sort(key=lambda r: (r["mile"], r["off"]))
+    return rows
 
 
 def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, google_link=None, track=None,
@@ -1307,7 +1500,7 @@ def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, g
         o, d = geocode(origin), geocode(destination)
         route = route_osrm([o] + [geocode(v) for v in (via or [])] + [d])
     variant = route_osrm([o] + [geocode(v) for v in variant_via] + [d]) if variant_via else None
-    frames, warnings = [], []
+    frames, warnings, places = [], [], None
     if curated:
         frames.append(load_curated(public=public))
     try:
@@ -1322,12 +1515,18 @@ def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, g
             if live.attrs.get("failed"):
                 warnings.append(f"OpenStreetMap unavailable for {len(live.attrs['failed'])} of {len(boxes)} route segments - re-run later to fill them")
             try:
-                live = fill_towns(live, osm_places(boxes))
+                places = osm_places(boxes); live = fill_towns(live, places)
             except RuntimeError as e:
                 warnings.append(f"town labels incomplete ({e})")
         frames.append(live)
     except RuntimeError as e:
         warnings.append(f"live {prov.upper()} pull failed ({e}); the map shows only the built-in listings")
+    if places is None:
+        try:
+            places = osm_places(_bboxes_along(route, chunk_mi=150, margin_mi=12))
+        except RuntimeError:
+            places = None
+    stays = build_stays(route=route, places=places, radius_mi=min(corridor_mi, 8), warnings=warnings)
     df = merge_sources(*frames)
     df = locate_on_route(df, route)
     far_ok = df["typ"].isin(["ER", "NIGHT"]) | ((df["typ"] == "UNK") & df["er_hint"])
@@ -1341,7 +1540,7 @@ def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, g
     gaps247 = coverage_gaps(df, total, types=("ER",), reach_mi=er_reach_mi)
     gapsnight = coverage_gaps(df, total, types=("ER", "NIGHT"), reach_mi=er_reach_mi)
     title = title or f"Vet corridor - {origin} to {destination}"
-    sub = (f"{len(df)} clinics &middot; {int(round(total))} mi driving &middot; ~{route['drive_h']:.1f} h &middot; "
+    sub = (f"{len(df)} clinics" + (f" &middot; {sum(1 for r in stays if r['k'] == 'stay')} dog-friendly stays" if stays else "") + f" &middot; {int(round(total))} mi driving &middot; ~{route['drive_h']:.1f} h &middot; "
            f"solid line = route" + (" &middot; dashed = variant" if variant is not None else "") +
            " &middot; map tiles need internet; the table always works")
     chain_txt = " - ".join(f"{_esc(r['name'])} {_tel(r['phone'])} (mi ~{r['mile']})" for _, r in chain.iterrows()) or "none within reach"
@@ -1355,11 +1554,11 @@ def corridor_map(origin=None, destination=None, *, via=None, variant_via=None, g
                    f"Mile markers and off-route distances are straight-line approximations against the drawn route.")
     if warnings:
         note_bottom += " <b>" + "; ".join(_esc(w) for w in warnings) + ".</b>"
-    page = render_html(df, title=title, sub=sub, note_top=note_top, note_bottom=note_bottom, route=route, variant=variant)
+    page = render_html(df, title=title, sub=sub, note_top=note_top, note_bottom=note_bottom, route=route, variant=variant, stays=stays)
     if out_html:
         pathlib.Path(out_html).write_text(page, encoding="utf-8")
     return {"df": df, "route": route, "variant": variant, "anchors": chain, "gaps_24_7": gaps247,
-            "gaps_overnight": gapsnight, "html": page, "provider": prov, "warnings": warnings}
+            "gaps_overnight": gapsnight, "html": page, "provider": prov, "warnings": warnings, "stays": stays}
 
 
 def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provider="auto", curated=True, out_html=None, public=True):
@@ -1367,7 +1566,7 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
     24/7, night and emergency-named clinics are kept out to twice the radius."""
     prov = _provider_pick(provider)
     lat, lng = geocode(home)
-    frames, warnings = [], []
+    frames, warnings, places = [], [], None
     if curated:
         frames.append(load_curated(public=public))
     try:
@@ -1386,12 +1585,18 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
             if live.attrs.get("failed"):
                 warnings.append("OpenStreetMap unavailable - re-run later")
             try:
-                live = fill_towns(live, osm_places(boxes))
+                places = osm_places(boxes); live = fill_towns(live, places)
             except RuntimeError as e:
                 warnings.append(f"town labels incomplete ({e})")
         frames.append(live)
     except RuntimeError as e:
         warnings.append(f"live {prov.upper()} pull failed ({e}); the map shows only the built-in listings")
+    if places is None:
+        try:
+            places = osm_places([_bbox_around(lat, lng, radius_mi)])
+        except RuntimeError:
+            places = None
+    stays = build_stays(center=(lat, lng), places=places, radius_mi=radius_mi, warnings=warnings)
     df = merge_sources(*frames)
     dist = haversine_mi(lat, lng, df["lat"].to_numpy(float), df["lng"].to_numpy(float))
     df["mile"] = np.round(dist, 1); df["off"] = np.round(dist, 1)
@@ -1401,16 +1606,17 @@ def home_map(home, *, label=None, radius_mi=15, rings=(5, 15), title=None, provi
     er = df[df["typ"] == "ER"].head(3)
     label = label or str(home)
     title = title or f"Home vet network - {label}"
-    sub = f"{len(df)} clinics around {_esc(label)} &middot; dashed rings = {' and '.join(str(r) for r in rings)} miles &middot; sorted by distance"
+    sub = (f"{len(df)} clinics" + (f" &middot; {sum(1 for r in stays if r['k'] == 'stay')} dog-friendly stays" if stays else "")
+           + f" around {_esc(label)} &middot; dashed rings = {' and '.join(str(r) for r in rings)} miles &middot; sorted by distance")
     note_top = "<b>Closest 24/7 doors:</b> " + (" - ".join(f"{_esc(r['name'])} {_tel(r['phone'])} ({r['off']} mi)" for _, r in er.iterrows()) or "none within reach") + "."
     note_bottom = (f"Listings pulled {_stamp()} from {_live_label(prov)}; hours change - call ahead, and on holidays. "
                    f"Distances are straight-line from home.")
     if warnings:
         note_bottom += " <b>" + "; ".join(_esc(w) for w in warnings) + ".</b>"
-    page = render_html(df, title=title, sub=sub, note_top=note_top, note_bottom=note_bottom, home=(lat, lng, label), rings=rings, mode="home")
+    page = render_html(df, title=title, sub=sub, note_top=note_top, note_bottom=note_bottom, home=(lat, lng, label), rings=rings, mode="home", stays=stays)
     if out_html:
         pathlib.Path(out_html).write_text(page, encoding="utf-8")
-    return {"df": df, "home": (lat, lng), "html": page, "provider": prov, "warnings": warnings}
+    return {"df": df, "home": (lat, lng), "html": page, "provider": prov, "warnings": warnings, "stays": stays}
 
 
 # vetlocator | 9 pwa

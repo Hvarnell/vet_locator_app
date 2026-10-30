@@ -61,6 +61,22 @@ def _html_button(label, color, onclick_js, height=64, key=""):
         components.html(snippet, height=height)
 
 
+def _split_stops(text):
+    """'Lincoln, NE, Moline, IL, South Bend, IN' -> ['Lincoln NE', 'Moline IL', 'South Bend IN'].  Stops are separated
+    by commas, semicolons or new lines; a state code or state name after a comma belongs to the town before it, so
+    it is never looked up as a place of its own (which once sent a route to Seattle)."""
+    states = {k.lower() for k in vl.US_STATES} | {v.lower() for v in vl.US_STATES.values()}
+    out = []
+    for part in (x.strip() for x in re.split(r"[,;\n]", text or "")):
+        if not part:
+            continue
+        if out and part.lower() in states:
+            out[-1] = f"{out[-1]} {part.upper() if len(part) == 2 else part}"
+        else:
+            out.append(part)
+    return out
+
+
 def _js(v):
     """JSON for inline JavaScript: '</' and '<!--' inside the data must not end the script block."""
     return json.dumps(v).replace("</", "<\\/").replace("<!--", "<\\!--")
@@ -75,8 +91,8 @@ with st.container(border=True):
         st.caption("e.g., avoid highways, add planned stops along the route")
         via_txt = variant_txt = google_link = ""; track_file = None; corridor_mi = 12; er_reach_mi = 45
         if custom:
-            via_txt = st.text_input("Planned stops along the route (comma-separated towns)", "")
-            variant_txt = st.text_input("Alternative route via (drawn dashed)", "")
+            via_txt = st.text_input("Planned stops along the route, in order", "", placeholder="Lincoln NE; Moline IL; South Bend IN")
+            variant_txt = st.text_input("Alternative route via (drawn dashed)", "", placeholder="Kalamazoo MI")
             google_link = st.text_input("Google Maps directions link", "",
                                         help="In Google Maps, set the drive up the way you want it (avoid highways, add stops), Share -> Copy link, paste here. Its stops replace From/To.")
             track_file = st.file_uploader("GPX or KML file (used exactly as drawn)", type=["gpx", "kml"])
@@ -163,8 +179,8 @@ if go:
     try:
         with st.spinner("Routing, pulling clinics and building the map (30 s to a few minutes for a long corridor)..."):
             if mode == "Driving corridor":
-                via = [s.strip() for s in via_txt.split(",") if s.strip()] or None
-                variant_via = [s.strip() for s in variant_txt.split(",") if s.strip()] or None
+                via = _split_stops(via_txt) or None
+                variant_via = _split_stops(variant_txt) or None
                 track = track_file.getvalue().decode("utf-8", "ignore") if track_file is not None else None
                 res = _build("corridor", origin=origin, destination=destination, via=via, variant_via=variant_via,
                              google_link=google_link.strip() or None, track=track, corridor_mi=corridor_mi, er_reach_mi=er_reach_mi)
